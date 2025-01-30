@@ -36,10 +36,10 @@ st.title("Stroke Prevention Decision Tool")
 st.write("Understand your stroke prevention treatment options based on research data.")
 
 st.sidebar.header("Patient Information Input")
-age = st.sidebar.slider("Age", 18, 100, 50)
-conditions = st.sidebar.multiselect("Existing Health Conditions", ["Hypertension", "Diabetes", "Smoking", "Obesity"])
-medications = st.sidebar.text_input("Current Medications")
-risk_factors = st.sidebar.multiselect("Other Risk Factors", ["Family History", "High Cholesterol", "Physical Inactivity"])
+age = st.sidebar.slider("Age", 18, 100, 50, key='age')
+conditions = st.sidebar.multiselect("Existing Health Conditions", ["Hypertension", "Diabetes", "Smoking", "Obesity"], key='conditions')
+medications = st.sidebar.text_input("Current Medications", key='medications')
+risk_factors = st.sidebar.multiselect("Other Risk Factors", ["Family History", "High Cholesterol", "Physical Inactivity"], key='risk_factors')
 
 if st.sidebar.button("Submit"):
     st.subheader("Recommended Treatment Options")
@@ -69,4 +69,5 @@ if st.sidebar.button("Submit"):
     with st.expander("Show Advanced Data (For Experts)"):
         st.dataframe(treatment_df)
     
-    st.button("Start Over")
+    if st.button("Start Over"):
+        st.experimental_rerun()
