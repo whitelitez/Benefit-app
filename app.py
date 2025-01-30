@@ -23,6 +23,7 @@ def get_treatment_data():
     df.columns = ['Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Relative Importance', 'Standardized Importance', 'Threshold Low', 'Threshold High', 'Estimate', 'Net Benefit']
     df.dropna(inplace=True)
     df = df[df['Net Benefit'] >= 0]  # Ensure all values for the pie chart are non-negative
+    df = df[['Outcome', 'Net Benefit']]  # Keep only necessary columns for display
     return df
 
 # App UI
@@ -36,14 +37,18 @@ medications = st.sidebar.text_input("Current Medications")
 risk_factors = st.sidebar.multiselect("Other Risk Factors", ["Family History", "High Cholesterol", "Physical Inactivity"])
 
 if st.sidebar.button("Submit"):
-    st.subheader("Treatment Options Based on Your Data")
-    st.write("The system is calculating your risk and benefit scores...")
+    st.subheader("Recommended Treatment Options")
+    st.write("Based on your data, here are the most suitable treatments:")
     
     treatment_df = get_treatment_data()
     
-    st.write("### Treatment Effectiveness")
-    st.dataframe(treatment_df[['Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Net Benefit']])
-
+    if not treatment_df.empty:
+        best_treatment = treatment_df.sort_values(by='Net Benefit', ascending=False).iloc[0]
+        st.write(f"✅ **Recommended Treatment:** {best_treatment['Outcome']}")
+        st.write("This treatment has shown the highest benefit for patients like you.")
+    else:
+        st.write("No suitable treatment found based on available data.")
+    
     # Pie Chart Visualization of Treatment Effectiveness
     st.subheader("Treatment Effectiveness (Per 1000 Patients)")
     if not treatment_df.empty:
@@ -54,14 +59,8 @@ if st.sidebar.button("Submit"):
     else:
         st.write("Insufficient data to generate a pie chart.")
     
-    st.subheader("Threshold Analysis")
-    st.write("This section highlights whether treatment benefits are within a reliable range.")
-    st.dataframe(treatment_df[['Outcome', 'Threshold Low', 'Threshold High']])
-
-    st.subheader("Final Recommendation")
-    if not treatment_df.empty:
-        best_treatment = treatment_df.sort_values(by='Net Benefit', ascending=False).iloc[0]
-        st.write(f"Based on the calculations, the most recommended treatment is **{best_treatment['Outcome']}**. Please consult your doctor before making a final decision.")
-    else:
-        st.write("No suitable data available to recommend a treatment.")
+    # Show Advanced Data Button
+    with st.expander("Show Advanced Data (For Experts)"):
+        st.dataframe(treatment_df)
+    
     st.button("Start Over")
