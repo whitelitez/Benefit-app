@@ -22,6 +22,7 @@ def get_treatment_data():
     df = df.iloc[3:, [2, 5, 6, 7, 8, 9, 37, 38, 39, 40]]  # Extract relevant columns
     df.columns = ['Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Relative Importance', 'Standardized Importance', 'Threshold Low', 'Threshold High', 'Estimate', 'Net Benefit']
     df.dropna(inplace=True)
+    df = df[df['Net Benefit'] >= 0]  # Ensure all values for the pie chart are non-negative
     return df
 
 # App UI
@@ -45,16 +46,22 @@ if st.sidebar.button("Submit"):
 
     # Pie Chart Visualization of Treatment Effectiveness
     st.subheader("Treatment Effectiveness (Per 1000 Patients)")
-    fig, ax = plt.subplots()
-    ax.pie(treatment_df['Net Benefit'], labels=treatment_df['Outcome'], autopct='%1.1f%%', startangle=90)
-    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-    st.pyplot(fig)
+    if not treatment_df.empty:
+        fig, ax = plt.subplots()
+        ax.pie(treatment_df['Net Benefit'], labels=treatment_df['Outcome'], autopct='%1.1f%%', startangle=90)
+        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        st.pyplot(fig)
+    else:
+        st.write("Insufficient data to generate a pie chart.")
     
     st.subheader("Threshold Analysis")
     st.write("This section highlights whether treatment benefits are within a reliable range.")
     st.dataframe(treatment_df[['Outcome', 'Threshold Low', 'Threshold High']])
 
     st.subheader("Final Recommendation")
-    best_treatment = treatment_df.sort_values(by='Net Benefit', ascending=False).iloc[0]
-    st.write(f"Based on the calculations, the most recommended treatment is **{best_treatment['Outcome']}**. Please consult your doctor before making a final decision.")
+    if not treatment_df.empty:
+        best_treatment = treatment_df.sort_values(by='Net Benefit', ascending=False).iloc[0]
+        st.write(f"Based on the calculations, the most recommended treatment is **{best_treatment['Outcome']}**. Please consult your doctor before making a final decision.")
+    else:
+        st.write("No suitable data available to recommend a treatment.")
     st.button("Start Over")
