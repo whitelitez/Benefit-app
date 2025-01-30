@@ -20,7 +20,9 @@ data = load_data()
 
 def get_treatment_data():
     df = data['RD_信頼区間_相関係数から_比']
-    df = df.iloc[3:, [1, 2, 5, 6, 7, 8, 9, 37, 38, 39, 40]]  # Ensure Outcome names are included
+    # Ensure the correct columns are selected
+    df = df.iloc[3:, [1, 2, 5, 6, 7, 8, 9, 37, 38, 39, 40]]
+    # Rename columns to match the expected format
     df.columns = ['Index', 'Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Relative Importance', 'Standardized Importance', 'Threshold Low', 'Threshold High', 'Estimate', 'Net Benefit']
     df.dropna(inplace=True)
     df = df[df['Net Benefit'] >= 0]  # Ensure all values for the pie chart are non-negative
