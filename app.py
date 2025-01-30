@@ -48,18 +48,21 @@ st.title("Stroke Prevention Decision Tool")
 st.write("Understand your stroke prevention treatment options based on research data.")
 
 st.sidebar.header("Patient Information Input")
+
+# Update session state before rendering widgets
+if st.sidebar.button("Submit"):
+    st.session_state.conditions = st.session_state.conditions  # Update session state
+    st.session_state.age = st.session_state.age
+    st.session_state.medications = st.session_state.medications
+    st.session_state.risk_factors = st.session_state.risk_factors
+
+# Render widgets with session state values
 age = st.sidebar.slider("Age", 18, 100, st.session_state.age, key='age')
 conditions = st.sidebar.multiselect("Existing Health Conditions", ["Hypertension", "Diabetes", "Smoking", "Obesity"], key='conditions', default=st.session_state.conditions)
 medications = st.sidebar.text_input("Current Medications", key='medications', value=st.session_state.medications)
 risk_factors = st.sidebar.multiselect("Other Risk Factors", ["Family History", "High Cholesterol", "Physical Inactivity"], key='risk_factors', default=st.session_state.risk_factors)
 
 if st.sidebar.button("Submit"):
-    # Update session state with selected values
-    st.session_state.conditions = conditions
-    st.session_state.age = age
-    st.session_state.medications = medications
-    st.session_state.risk_factors = risk_factors
-
     st.subheader("Recommended Treatment Options")
     st.write("Based on your data, here are the most suitable treatments:")
     
