@@ -31,17 +31,33 @@ def get_treatment_data():
 jp_font_path = fm.findSystemFonts(fontpaths=None, fontext='ttf')[0]  # Get a system font
 jp_font_prop = fm.FontProperties(fname=jp_font_path)
 
+# Initialize session state for all inputs
+if 'conditions' not in st.session_state:
+    st.session_state.conditions = []
+if 'age' not in st.session_state:
+    st.session_state.age = 50  # Default age
+if 'medications' not in st.session_state:
+    st.session_state.medications = ""  # Default medications
+if 'risk_factors' not in st.session_state:
+    st.session_state.risk_factors = []  # Default risk factors
+
 # App UI
 st.title("Stroke Prevention Decision Tool")
 st.write("Understand your stroke prevention treatment options based on research data.")
 
 st.sidebar.header("Patient Information Input")
-age = st.sidebar.slider("Age", 18, 100, 50, key='age')
-conditions = st.sidebar.multiselect("Existing Health Conditions", ["Hypertension", "Diabetes", "Smoking", "Obesity"], key='conditions')
-medications = st.sidebar.text_input("Current Medications", key='medications')
-risk_factors = st.sidebar.multiselect("Other Risk Factors", ["Family History", "High Cholesterol", "Physical Inactivity"], key='risk_factors')
+age = st.sidebar.slider("Age", 18, 100, st.session_state.age, key='age')
+conditions = st.sidebar.multiselect("Existing Health Conditions", ["Hypertension", "Diabetes", "Smoking", "Obesity"], key='conditions', default=st.session_state.conditions)
+medications = st.sidebar.text_input("Current Medications", key='medications', value=st.session_state.medications)
+risk_factors = st.sidebar.multiselect("Other Risk Factors", ["Family History", "High Cholesterol", "Physical Inactivity"], key='risk_factors', default=st.session_state.risk_factors)
 
 if st.sidebar.button("Submit"):
+    # Update session state with selected values
+    st.session_state.conditions = conditions
+    st.session_state.age = age
+    st.session_state.medications = medications
+    st.session_state.risk_factors = risk_factors
+
     st.subheader("Recommended Treatment Options")
     st.write("Based on your data, here are the most suitable treatments:")
     
@@ -68,7 +84,12 @@ if st.sidebar.button("Submit"):
     # Show Advanced Data Button
     with st.expander("Show Advanced Data (For Experts)"):
         st.dataframe(treatment_df)
-    
-    if st.button("Start Over"):
-        st.session_state.clear()
-        st.experimental_rerun()
+
+# Reset functionality
+if st.button("Start Over"):
+    # Reset session state variables to their defaults
+    st.session_state.conditions = []
+    st.session_state.age = 50
+    st.session_state.medications = ""
+    st.session_state.risk_factors = []
+    st.experimental_rerun()  # Rerun the app to reflect the reset state
