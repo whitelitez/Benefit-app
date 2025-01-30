@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 
 # Get the absolute path to the Excel file
 FILE_PATH = os.path.join(os.path.dirname(__file__), "net_benefit_rd_md_v0.97.xlsx")
@@ -25,6 +26,10 @@ def get_treatment_data():
     df = df[df['Net Benefit'] >= 0]  # Ensure all values for the pie chart are non-negative
     df = df[['Outcome', 'Net Benefit']]  # Keep only necessary columns for display
     return df
+
+# Load Japanese font for Matplotlib
+jp_font_path = fm.findSystemFonts(fontpaths=None, fontext='ttf')[0]  # Get a system font
+jp_font_prop = fm.FontProperties(fname=jp_font_path)
 
 # App UI
 st.title("Stroke Prevention Decision Tool")
@@ -53,7 +58,8 @@ if st.sidebar.button("Submit"):
     st.subheader("Treatment Effectiveness (Per 1000 Patients)")
     if not treatment_df.empty:
         fig, ax = plt.subplots()
-        ax.pie(treatment_df['Net Benefit'], labels=treatment_df['Outcome'], autopct='%1.1f%%', startangle=90)
+        ax.pie(treatment_df['Net Benefit'], labels=treatment_df['Outcome'], autopct='%1.1f%%', startangle=90, 
+               textprops={'fontproperties': jp_font_prop})
         ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
         st.pyplot(fig)
     else:
