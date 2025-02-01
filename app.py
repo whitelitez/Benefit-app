@@ -20,14 +20,20 @@ data = load_data()
 def get_treatment_data():
     df = data['RD_信頼区間_相関係数から_比']
     
+    # Print actual column names for debugging
+    st.write("### データセットの実際のカラム名:")
+    st.write(df.columns.tolist())
+    
     # Dynamically find matching columns to avoid KeyErrors
     expected_cols = ['アウトカムk', 'RDijkまたはMDijk 介入群の絶対リスク-対照群の絶対リスク=Eijk', '95%信頼区間下限値', '95%信頼区間上限値', 'Estimate']
     actual_cols = df.columns.tolist()
-    col_mapping = {col: actual for col in expected_cols for actual in actual_cols if col in actual}
+    col_mapping = {col: next((actual for actual in actual_cols if col in actual), None) for col in expected_cols}
     
     # Ensure all expected columns exist
-    if not all(col in col_mapping for col in expected_cols):
-        raise KeyError("One or more expected columns not found in the dataset")
+    missing_cols = [col for col in expected_cols if col_mapping[col] is None]
+    if missing_cols:
+        st.error(f"以下のカラムが見つかりません: {missing_cols}")
+        return pd.DataFrame()  # Return an empty DataFrame to prevent crash
     
     # Extract relevant columns
     df = df[[col_mapping[col] for col in expected_cols]]
@@ -83,31 +89,26 @@ if st.sidebar.button("送信"):
     
     treatment_df = get_treatment_data()
     
-    # Apply custom user inputs
-    if not treatment_df.empty:
+    if treatment_df.empty:
+        st.write("データの読み込みに失敗しました。適切なデータセットを確認してください。")
+    else:
+        # Apply custom user inputs
         treatment_df.at[0, 'Risk Difference'] = custom_risk_difference
         treatment_df.at[0, 'Lower CI'] = custom_lower_ci
         treatment_df.at[0, 'Upper CI'] = custom_upper_ci
         treatment_df.at[0, 'Net Benefit'] = custom_net_benefit
     
-    st.write("### 治療の有効性")
-    st.dataframe(treatment_df[['Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Benefit Category']])
-
-    # Pie Chart Visualization
-    st.subheader("治療の有効性（1000人あたり）")
-    if not treatment_df.empty and treatment_df['Normalized Net Benefit'].sum() > 0:
-        fig, ax = plt.subplots()
-        ax.pie(treatment_df['Normalized Net Benefit'], labels=treatment_df['Outcome'], autopct='%1.1f%%', startangle=90)
-        ax.axis('equal')
-        st.pyplot(fig)
-    else:
-        st.write("データが不足しているため、円グラフを表示できません。")
+        st.write("### 治療の有効性")
+        st.dataframe(treatment_df[['Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Benefit Category']])
     
-    st.subheader("最終推奨事項")
-    if not treatment_df.empty:
-        best_treatment = treatment_df.sort_values(by='Net Benefit', ascending=False).iloc[0]
-        st.write(f"計算結果に基づき、最も推奨される治療は **{best_treatment['Outcome']}** です。最終決定の前に医師に相談してください。")
-    else:
-        st.write("適切なデータがないため、推奨治療を計算できません。")
+        # Pie Chart Visualization
+        st.subheader("治療の有効性（1000人あたり）")
+        if treatment_df['Normalized Net Benefit'].sum() > 0:
+            fig, ax = plt.subplots()
+            ax.pie(treatment_df['Normalized Net Benefit'], labels=treatment_df['Outcome'], autopct='%1.1f%%', startangle=90)
+            ax.axis('equal')
+            st.pyplot(fig)
+        else:
+            st.write("データが不足しているため、円グラフを表示できません。")
     
     st.button("最初からやり直す")
