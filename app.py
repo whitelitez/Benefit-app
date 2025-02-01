@@ -1,103 +1,125 @@
 import streamlit as st
-import pandas as pd
 
-st.title("脳卒中予防の意思決定ツール")
-st.write("""
-このデモでは、5つのアウトカム（脳卒中予防、心不全予防、めまい、頻尿、転倒）の
-Risk Difference (RD) と 95%信頼区間をユーザーが入力できるようにして、
-簡易的な正味の益 (Net Benefit) を計算します。
+st.title("高血圧治療の簡易評価ツール（5アウトカム + 3段階重要度）")
+
+st.markdown("""
+このツールでは、脳卒中予防・心不全予防・めまい・頻尿・転倒の5つのアウトカムそれぞれに対して、
+以下の情報を入力できます：
+- **リスク差 (RD)**：介入群の絶対リスク - 対照群の絶対リスク  
+- **有益 (+1) / 有害 (−1)**：そのアウトカムが全体にプラスかマイナスか  
+- **重要度 (1.0 / 0.5 / 0.0)**：非常に重要、重要、または重要でない  
+入力内容に基づいて、総合的な影響に対するコメントを表示します。
+（数値の結果は一切表示しません）
 """)
 
-# -------------------------
-# 1. Define outcomes & weights
-# -------------------------
+# ----------------------------------------------------------------------------------
+# Define the five outcomes with default RD and default sign
+# (Users can override these in the UI)
+# ----------------------------------------------------------------------------------
 outcomes_info = [
-    {"name_jp": "脳卒中予防", "is_beneficial": True,  "default_rd": 0.10, "default_low": 0.05, "default_high": 0.15, "weight": 100},
-    {"name_jp": "心不全予防", "is_beneficial": True,  "default_rd": -0.10,"default_low": -0.16,"default_high": -0.04,"weight": 29},
-    {"name_jp": "めまい",    "is_beneficial": False, "default_rd": 0.02, "default_low": 0.011,"default_high": 0.029,"weight": 5},
-    {"name_jp": "頻尿",     "is_beneficial": False, "default_rd": -0.01,"default_low": -0.03,"default_high": 0.01, "weight": 4},
-    {"name_jp": "転倒",     "is_beneficial": False, "default_rd": -0.02,"default_low": -0.06,"default_high": 0.02, "weight": 13},
+    {
+        "name_jp": "脳卒中予防", 
+        "default_rd": 0.10,
+        "default_sign": +1,  # Typically beneficial
+    },
+    {
+        "name_jp": "心不全予防",
+        "default_rd": 0.10,
+        "default_sign": +1,  # Typically beneficial
+    },
+    {
+        "name_jp": "めまい",
+        "default_rd": 0.02,
+        "default_sign": -1,  # Typically harmful
+    },
+    {
+        "name_jp": "頻尿",
+        "default_rd": -0.01,
+        "default_sign": -1,  # Typically harmful
+    },
+    {
+        "name_jp": "転倒",
+        "default_rd": -0.02,
+        "default_sign": -1,  # Typically harmful
+    },
 ]
 
-st.sidebar.header("アウトカムごとの入力 (E_ijk & 95%CI)")
-st.sidebar.write("**下の数値を変更して結果を確認してください。**")
+st.sidebar.header("アウトカム設定")
 
-# -------------------------
-# 2. User Inputs for RD & CIs
-# -------------------------
 user_data = []
 for outcome in outcomes_info:
-    name = outcome["name_jp"]
-    sign = 1 if outcome["is_beneficial"] else -1
-    w = outcome["weight"]  # direct weighting approach
+    name_jp = outcome["name_jp"]
+    default_rd = outcome["default_rd"]
+    default_sign = outcome["default_sign"]
 
-    rd = st.sidebar.number_input(
-        f"{name} RD (default={outcome['default_rd']})", 
-        value=outcome['default_rd'], 
-        step=0.01, 
-        format="%.3f"
+    st.sidebar.write(f"### {name_jp}")
+    
+    # User sets RD
+    rd_val = st.sidebar.number_input(
+        f"{name_jp} のリスク差 (RD)",
+        value=default_rd,
+        step=0.01,
+        format="%.3f",
+        key=f"rd_{name_jp}"
     )
-    lower_ci = st.sidebar.number_input(
-        f"{name} Lower CI (default={outcome['default_low']})", 
-        value=outcome['default_low'], 
-        step=0.01, 
-        format="%.3f"
+    
+    # User picks sign: beneficial or harmful
+    sign_choice = st.sidebar.radio(
+        f"{name_jp} は有益か有害か？",
+        options=[("有益 (+1)", +1), ("有害 (−1)", -1)],
+        index=0 if default_sign == +1 else 1,
+        key=f"sign_{name_jp}"
     )
-    upper_ci = st.sidebar.number_input(
-        f"{name} Upper CI (default={outcome['default_high']})", 
-        value=outcome['default_high'], 
-        step=0.01, 
-        format="%.3f"
+    
+    # User picks importance: 1.0, 0.5, or 0.0
+    imp_choice = st.sidebar.radio(
+        f"{name_jp} の重要度",
+        options=[("非常に重要 (1.0)", 1.0),
+                 ("重要 (0.5)", 0.5),
+                 ("重要でない (0.0)", 0.0)],
+        index=0,  # default to very important (you can adjust)
+        key=f"imp_{name_jp}"
     )
 
-    # Store data in a structure for further display/calculation
     user_data.append({
-        "アウトカム": name,
-        "益/害": "益" if sign == 1 else "害",
-        "RD (E_ijk)": rd,
-        "95%CI Lower": lower_ci,
-        "95%CI Upper": upper_ci,
-        "Weight (W_k)": w,
-        "Sign (F_k)": sign
+        "アウトカム": name_jp,
+        "RD": rd_val,
+        "Sign": sign_choice[1],  # numeric +1 or -1
+        "Importance": imp_choice[1],  # numeric 1.0, 0.5, or 0.0
     })
 
-# -------------------------
-# 3. Compute Net Benefit
-# -------------------------
-# NetBenefit = sum( F_k * E_k * (W_k/100) )
-net_benefit = 0.0
-for row in user_data:
-    sign = row["Sign (F_k)"]
-    e_val = row["RD (E_ijk)"]
-    weight = row["Weight (W_k)"]
-    net_benefit += sign * e_val * (weight / 100.0)
+if st.button("評価結果を表示"):
+    # -----------------------
+    # Calculate net effect behind the scenes
+    # net_effect = SUM(sign * rd * importance)
+    # -----------------------
+    net_effect = 0.0
+    for row in user_data:
+        net_effect += row["Sign"] * row["RD"] * row["Importance"]
+    
+    st.subheader("総合コメント")
+    # Example threshold-based statements (tweak as needed):
+    if net_effect > 0.05:
+        st.write("""
+        全体的に、**プラスの影響**が得られる可能性がやや高いように見えます。
+        さらなる検討や医療専門家の意見を踏まえて、最適な治療を選択してください。
+        """)
+    elif net_effect > 0:
+        st.write("""
+        わずかながらプラスの影響が期待できるかもしれません。
+        ただし、状況により異なるため、慎重に判断してください。
+        """)
+    elif abs(net_effect) < 1e-9:
+        st.write("""
+        入力された値の範囲では、全体的にプラスともマイナスとも言えない状況です。
+        個人差や他の因子を合わせて考慮する必要があります。
+        """)
+    else:
+        st.write("""
+        全体として、**注意が必要な可能性**がうかがえます。
+        副作用やリスクが上回る恐れもありますので、担当医とよくご相談ください。
+        """)
 
-# Multiply by 1000 for "per 1000 patients" interpretation
-net_benefit_per_1000 = net_benefit * 1000
-
-# -------------------------
-# 4. Display Results
-# -------------------------
-st.subheader("入力されたアウトカムデータ")
-df_display = pd.DataFrame(user_data)
-df_display = df_display[["アウトカム", "益/害", "RD (E_ijk)", "95%CI Lower", "95%CI Upper", "Weight (W_k)"]]
-st.table(df_display)
-
-st.subheader("正味の益 (Net Benefit)")
-st.write(f"""
-- **合計正味の益** (単位なし): `{net_benefit:.4f}`
-- **1000人あたりの正味の益**: `{net_benefit_per_1000:.1f}`
-""")
-st.markdown("""
-*注*: これは簡易計算です。実際のバリアンスや相関行列による
-厳密な信頼区間計算は含んでいません。
-""")
-
-st.success("処理が完了しました。下の数値を変えて正味の益が変化する様子を試してみてください！")
-
-# (Optional) Additional logic or thresholds
-# For example, we could classify the result:
-if net_benefit_per_1000 > 0:
-    st.info("**推定: 治療介入による正味の益はプラスです。**")
-else:
-    st.warning("**推定: 治療介入による正味の益はマイナスかもしれません。**")
+    # (Optional) Show a table of user inputs if you like:
+    st.write("### 参考：入力データ")
+    st.table(user_data)
