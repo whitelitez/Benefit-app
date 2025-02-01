@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 
 # Get the absolute path to the Excel file
 FILE_PATH = os.path.join(os.path.dirname(__file__), "net_benefit_rd_md_v0.97.xlsx")
@@ -11,7 +12,7 @@ FILE_PATH = os.path.join(os.path.dirname(__file__), "net_benefit_rd_md_v0.97.xls
 @st.cache_data
 def load_data():
     xls = pd.ExcelFile(FILE_PATH)
-    data = {sheet: xls.parse(sheet, header=2) for sheet in xls.sheet_names}  # Adjusted header row
+    data = {sheet: xls.parse(sheet) for sheet in xls.sheet_names}
     return data
 
 # Load the data once at startup
@@ -19,96 +20,81 @@ data = load_data()
 
 def get_treatment_data():
     df = data['RD_信頼区間_相関係数から_比']
-    
-    # Print actual column names for debugging
-    st.write("### データセットの実際のカラム名:")
-    st.write(df.columns.tolist())
-    
-    # Dynamically find matching columns to avoid KeyErrors
-    expected_cols = ['アウトカムk', 'RDijkまたはMDijk 介入群の絶対リスク-対照群の絶対リスク=Eijk', '95%信頼区間下限値', '95%信頼区間上限値', 'Estimate']
-    actual_cols = df.columns.tolist()
-    col_mapping = {col: next((actual for actual in actual_cols if col in actual), None) for col in expected_cols}
-    
-    # Ensure all expected columns exist
-    missing_cols = [col for col in expected_cols if col_mapping[col] is None]
-    if missing_cols:
-        st.error(f"以下のカラムが見つかりません: {missing_cols}")
-        return pd.DataFrame()  # Return an empty DataFrame to prevent crash
-    
-    # Extract relevant columns
-    df = df[[col_mapping[col] for col in expected_cols]]
-    df.columns = ['Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Net Benefit']
-    df.dropna(subset=['Outcome'], inplace=True)
-    
-    # Convert numeric columns
-    numeric_cols = ['Risk Difference', 'Lower CI', 'Upper CI', 'Net Benefit']
-    df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
-    
-    # Normalize Net Benefit values
-    max_benefit = df['Net Benefit'].max()
-    min_benefit = df['Net Benefit'].min()
-    if max_benefit != min_benefit:
-        df['Normalized Net Benefit'] = (df['Net Benefit'] - min_benefit) / (max_benefit - min_benefit)
-    else:
-        df['Normalized Net Benefit'] = 1
-
-    # Categorize Benefit Levels
-    def classify_benefit(value):
-        if value >= 0.07:
-            return "高い利益 (High Benefit)"
-        elif value >= 0.03:
-            return "中程度の利益 (Moderate Benefit)"
-        elif value >= 0.00:
-            return "低い利益 (Low Benefit)"
-        else:
-            return "利益なし (No Benefit)"
-    
-    df['Benefit Category'] = df['Net Benefit'].apply(classify_benefit)
+    # Ensure the correct columns are selected
+    df = df.iloc[3:, [1, 2, 5, 6, 7, 8, 9, 37, 38, 39, 40]]
+    # Rename columns to match the expected format
+    df.columns = ['Index', 'Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Relative Importance', 'Standardized Importance', 'Threshold Low', 'Threshold High', 'Estimate', 'Net Benefit']
+    df.dropna(inplace=True)
+    df = df[df['Net Benefit'] >= 0]  # Ensure all values for the pie chart are non-negative
+    df = df[['Outcome', 'Net Benefit']]  # Keep only necessary columns for display
     return df
 
+# Load Japanese font for Matplotlib
+jp_font_path = fm.findSystemFonts(fontpaths=None, fontext='ttf')[0]  # Get a system font
+jp_font_prop = fm.FontProperties(fname=jp_font_path)
+
+# Initialize session state for all inputs
+if 'conditions' not in st.session_state:
+    st.session_state.conditions = []
+if 'age' not in st.session_state:
+    st.session_state.age = 50  # Default age
+if 'medications' not in st.session_state:
+    st.session_state.medications = ""  # Default medications
+if 'risk_factors' not in st.session_state:
+    st.session_state.risk_factors = []  # Default risk factors
+
 # App UI
-st.title("脳卒中予防の意思決定ツール")
-st.write("研究データに基づいた脳卒中予防治療の選択肢を理解しましょう。")
+st.title("Stroke Prevention Decision Tool")
+st.write("Understand your stroke prevention treatment options based on research data.")
 
-st.sidebar.header("患者情報入力")
-age = st.sidebar.slider("年齢", 18, 100, 50)
-conditions = st.sidebar.multiselect("既存の健康状態", ["高血圧", "糖尿病", "喫煙", "肥満"])
-medications = st.sidebar.text_input("現在の服用薬")
-risk_factors = st.sidebar.multiselect("その他のリスク要因", ["家族歴", "高コレステロール", "運動不足"])
+st.sidebar.header("Patient Information Input")
 
-# User-friendly input fields
-st.sidebar.subheader("カスタムデータ入力")
-custom_risk_difference = st.sidebar.select_slider("リスク差のカスタム値", options=[-0.1, -0.05, 0.0, 0.05, 0.1, 0.15, 0.2], value=0.0)
-custom_lower_ci = st.sidebar.select_slider("信頼区間下限のカスタム値", options=[-0.1, -0.05, 0.0, 0.05, 0.1], value=0.0)
-custom_upper_ci = st.sidebar.select_slider("信頼区間上限のカスタム値", options=[0.0, 0.05, 0.1, 0.15, 0.2], value=0.1)
-custom_net_benefit = st.sidebar.select_slider("ネットベネフィットのカスタム値", options=[-0.1, 0.0, 0.05, 0.1, 0.2], value=0.0)
+# Render widgets with session state values
+age = st.sidebar.slider("Age", 18, 100, st.session_state.age, key='age_slider')
+conditions = st.sidebar.multiselect("Existing Health Conditions", ["Hypertension", "Diabetes", "Smoking", "Obesity"], key='conditions_select', default=st.session_state.conditions)
+medications = st.sidebar.text_input("Current Medications", key='medications_input', value=st.session_state.medications)
+risk_factors = st.sidebar.multiselect("Other Risk Factors", ["Family History", "High Cholesterol", "Physical Inactivity"], key='risk_factors_select', default=st.session_state.risk_factors)
 
-if st.sidebar.button("送信"):
-    st.subheader("あなたのデータに基づく治療オプション")
-    st.write("システムがリスクとベネフィットスコアを計算しています...")
+# Submit button
+if st.sidebar.button("Submit", key='submit_button'):
+    # Update session state with selected values
+    st.session_state.conditions = conditions
+    st.session_state.age = age
+    st.session_state.medications = medications
+    st.session_state.risk_factors = risk_factors
+
+    st.subheader("Recommended Treatment Options")
+    st.write("Based on your data, here are the most suitable treatments:")
     
     treatment_df = get_treatment_data()
     
-    if treatment_df.empty:
-        st.write("データの読み込みに失敗しました。適切なデータセットを確認してください。")
+    if not treatment_df.empty:
+        best_treatment = treatment_df.sort_values(by='Net Benefit', ascending=False).iloc[0]
+        st.write(f"✅ **Recommended Treatment:** {best_treatment['Outcome']}")
+        st.write("This treatment has shown the highest benefit for patients like you.")
     else:
-        # Apply custom user inputs
-        treatment_df.at[0, 'Risk Difference'] = custom_risk_difference
-        treatment_df.at[0, 'Lower CI'] = custom_lower_ci
-        treatment_df.at[0, 'Upper CI'] = custom_upper_ci
-        treatment_df.at[0, 'Net Benefit'] = custom_net_benefit
+        st.write("No suitable treatment found based on available data.")
     
-        st.write("### 治療の有効性")
-        st.dataframe(treatment_df[['Outcome', 'Risk Difference', 'Lower CI', 'Upper CI', 'Benefit Category']])
+    # Pie Chart Visualization of Treatment Effectiveness
+    st.subheader("Treatment Effectiveness (Per 1000 Patients)")
+    if not treatment_df.empty:
+        fig, ax = plt.subplots()
+        ax.pie(treatment_df['Net Benefit'], labels=treatment_df['Outcome'].astype(str), autopct='%1.1f%%', startangle=90, 
+               textprops={'fontproperties': jp_font_prop})
+        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        st.pyplot(fig)
+    else:
+        st.write("Insufficient data to generate a pie chart.")
     
-        # Pie Chart Visualization
-        st.subheader("治療の有効性（1000人あたり）")
-        if treatment_df['Normalized Net Benefit'].sum() > 0:
-            fig, ax = plt.subplots()
-            ax.pie(treatment_df['Normalized Net Benefit'], labels=treatment_df['Outcome'], autopct='%1.1f%%', startangle=90)
-            ax.axis('equal')
-            st.pyplot(fig)
-        else:
-            st.write("データが不足しているため、円グラフを表示できません。")
-    
-    st.button("最初からやり直す")
+    # Show Advanced Data Button
+    with st.expander("Show Advanced Data (For Experts)"):
+        st.dataframe(treatment_df)
+
+# Reset functionality
+if st.button("Start Over", key='start_over_button'):
+    # Reset session state variables to their defaults
+    st.session_state.conditions = []
+    st.session_state.age = 50
+    st.session_state.medications = ""
+    st.session_state.risk_factors = []
+    st.experimental_rerun()  # Rerun the app to reflect the reset state
