@@ -4,7 +4,7 @@ def main():
     # Title
     st.title("Net Benefit Evaluation Prototype")
 
-    # Disclaimers/Overview in red to highlight they are placeholders/drafts
+    # Disclaimers/Overview in red to highlight placeholders/drafts
     st.markdown(
         """
         <p style='color:red; font-weight:bold;'>
@@ -24,7 +24,6 @@ def main():
     )
 
     # Define the outcomes we want to evaluate.
-    # We only store outcome labels here; all numeric values come from user inputs.
     outcome_labels = [
         "Prevention of stroke",
         "Prevention of heart failure",
@@ -33,18 +32,16 @@ def main():
         "Fall risk"
     ]
 
+    # Sidebar inputs for RD, CI, and importance
     st.sidebar.header("1) Outcomes, Risk Differences, and Confidence Intervals")
 
-    # We'll store user-input data for each outcome in a list
     user_data = []
-
     for label in outcome_labels:
         st.sidebar.subheader(label)
 
-        # Let user input numeric RD and CI from scratch
         rd_value = st.sidebar.number_input(
             f"{label} – Risk Difference (E_ijk)",
-            value=0.0,  # default 0.0 so user sees an initial blank state
+            value=0.0,  # default 0.0
             format="%.4f"
         )
         ci_lower = st.sidebar.number_input(
@@ -58,7 +55,6 @@ def main():
             format="%.4f"
         )
 
-        # Importance selection
         chosen_importance_label = st.sidebar.radio(
             f"{label} – Importance",
             ["High", "Medium", "Low"],
@@ -66,7 +62,6 @@ def main():
         )
         imp_value = convert_importance(chosen_importance_label)
 
-        # Save all info in a dictionary
         user_data.append({
             "outcome": label,
             "rd": rd_value,
@@ -85,30 +80,25 @@ def main():
     access_label = st.sidebar.radio("Access / Transportation Issues", constraint_options, index=0)
     care_label = st.sidebar.radio("Home Care / Assistance Issues", constraint_options, index=0)
 
-    # Convert these labels to numeric values for the logic
     cost_val = constraint_to_numeric(cost_label)
     access_val = constraint_to_numeric(access_label)
     care_val = constraint_to_numeric(care_label)
 
-    # Action button
     if st.button("Calculate Net Benefit"):
         show_results(user_data, cost_val, access_val, care_val)
 
 
 def show_results(user_data, cost_val, access_val, care_val):
     """
-    Summarize the net benefit calculation using a simple approach:
+    Summarize the net benefit using a simple approach:
        net_effect = sum(RD_k * importance_k).
-
-    In production, replace or supplement this with the 
-    professor's exact formulas (RD, AHP, DCE, correlation, etc.).
+    Replace this with the professor's formulas (RD, AHP, DCE, correlation, etc.) as needed.
     """
     st.subheader("A) Outcome-Level Details")
 
+    # Calculate net effect
     net_effect = 0.0
     for row in user_data:
-        # Basic additive model. In a real scenario,
-        # factor in correlation matrices or more complex methods.
         net_effect += row["rd"] * row["importance"]
 
     # Provide interpretive feedback
@@ -124,18 +114,10 @@ def show_results(user_data, cost_val, access_val, care_val):
         else:
             st.info("Slightly beneficial, but smaller magnitude.")
 
-    # Show per-outcome data
+    # Show individual outcome details
     st.markdown("### Individual Outcomes")
     for row in user_data:
-        arrow = get_arrow(row["rd"])
-        stars_html = star_html_3(row["importance"])
-        sign_text = "Positive RD" if row["rd"] > 0 else "Negative RD" if row["rd"] < 0 else "Zero"
-
-        st.markdown(
-            f"- **{row['outcome']}**: {stars_html} {arrow} ({sign_text}) "
-            f"[95% CI: {row['ci_lower']}, {row['ci_upper']}]",
-            unsafe_allow_html=True
-        )
+        display_outcome_line(row)
 
     # Constraints
     st.subheader("B) Constraints")
@@ -157,7 +139,6 @@ def show_results(user_data, cost_val, access_val, care_val):
 
     # Red disclaimer for placeholders
     st.subheader("C) Advanced Methods")
-
     st.markdown(
         """
         <p style='color:red; font-weight:bold;'>
@@ -174,6 +155,34 @@ def show_results(user_data, cost_val, access_val, care_val):
         """,
         unsafe_allow_html=True
     )
+
+
+def display_outcome_line(row):
+    """
+    Constructs a user-friendly outcome line, omitting "(Zero)" and
+    "[95% CI: 0.0, 0.0]" if those values are still default or near zero.
+    """
+    arrow = get_arrow(row["rd"])
+    stars_html = star_html_3(row["importance"])
+
+    # Omit "Zero" if RD is effectively 0.0
+    if abs(row["rd"]) < 1e-9:
+        sign_text = ""
+    else:
+        sign_text = "Positive RD" if row["rd"] > 0 else "Negative RD"
+
+    # If both CI Lower/Upper are 0.0, we hide it
+    show_ci = not (abs(row["ci_lower"]) < 1e-9 and abs(row["ci_upper"]) < 1e-9)
+    ci_text = f"[95% CI: {row['ci_lower']}, {row['ci_upper']}]" if show_ci else ""
+
+    # Build the display line
+    display_line = f"- **{row['outcome']}**: {stars_html} {arrow}"
+    if sign_text:
+        display_line += f" ({sign_text})"
+    if ci_text:
+        display_line += f" {ci_text}"
+
+    st.markdown(display_line, unsafe_allow_html=True)
 
 
 # ---------------- HELPER FUNCTIONS ----------------
@@ -214,7 +223,7 @@ def numeric_to_constraint_label(value):
 
 def get_arrow(rd):
     """
-    Return arrow based on Risk Difference sign and threshold.
+    Return an arrow based on RD sign and threshold.
     """
     if rd > 0.05:
         return "⬆️"
