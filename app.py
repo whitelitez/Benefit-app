@@ -1,68 +1,72 @@
 import streamlit as st
 
 def main():
-    st.title("Net Benefit Evaluation Prototype")
+    st.title("Net Benefit Evaluation Prototype (No Hardcoded Placeholders)")
 
     st.markdown("""
-    **Goal**: Calculate the net benefit of a hypothetical hypertension treatment 
-    based on user inputs, including:
-    - Risk Difference (RD) for various outcomes
-    - Outcome importance (shown with colored stars)
-    - Additional constraints (cost, access, care)
-    
-    This prototype integrates placeholders for advanced weighting or modeling 
-    methods (AHP, Swing Weighting, Discrete Choice Experiments).
+    **Overview**:
+    - This prototype lets users (e.g., patients) input **Risk Differences** (RD),
+      **Confidence Intervals**, and **Outcome Importance** for a set of outcomes.
+    - No hard-coded RD defaults — the user explicitly enters all values.
+    - We demonstrate a simple net benefit calculation based on (RD * importance).
+    - You can later integrate advanced formulas (AHP, Swing Weighting, etc.).
     """)
 
-    # 1) Define outcomes we want to consider (can be expanded or made dynamic)
-    outcome_defs = [
-        {"label": "Prevention of stroke (beneficial)", "default_rd": 0.10},
-        {"label": "Prevention of heart failure (beneficial)", "default_rd": -0.10},
-        {"label": "Increased dizziness (harmful)", "default_rd": 0.02},
-        {"label": "Increased urination frequency (harmful)", "default_rd": -0.01},
-        {"label": "Increased fall risk (harmful)", "default_rd": -0.02},
+    # Define the outcomes we want to evaluate.
+    # We'll just name them here; the user sets the numeric values.
+    outcome_labels = [
+        "Prevention of stroke",
+        "Prevention of heart failure",
+        "Dizziness",
+        "Urination frequency",
+        "Fall risk"
     ]
 
-    st.sidebar.header("1) Outcomes and Risk Differences (RD)")
-    st.sidebar.write("Specify each outcome’s approximate RD and its importance.")
-    
-    # Placeholders to store user inputs
+    st.sidebar.header("1) Outcomes, Risk Differences, and Confidence Intervals")
+
+    # We'll store user-input data for each outcome in a list
     user_data = []
-    
-    for od in outcome_defs:
-        st.sidebar.subheader(od["label"])
-        
-        # For demonstration: slider range -0.20..+0.20
-        # But you can adapt to your typical RD range.
-        rd_value = st.sidebar.slider(
-            f"{od['label']} (Risk Difference)",
-            min_value=-0.20, max_value=0.20,
-            value=od["default_rd"], step=0.01
+
+    for label in outcome_labels:
+        st.sidebar.subheader(label)
+
+        # Let user input numeric RD, CI lower, CI upper from scratch
+        rd_value = st.sidebar.number_input(
+            f"{label} – Risk Difference (E_ijk)",
+            value=0.0,  # default to 0.0 for demonstration
+            format="%.4f"
         )
-        
-        # If beneficial vs harmful is relevant, you could let user pick or
-        # store it in the definitions. For example:
-        # sign = +1 for beneficial, -1 for harmful, then RD * sign. 
-        # For simplicity, assume RD is "signed" already (positive = harmful, negative = beneficial).
-        
+        ci_lower = st.sidebar.number_input(
+            f"{label} – 95% CI (Lower)",
+            value=0.0,
+            format="%.4f"
+        )
+        ci_upper = st.sidebar.number_input(
+            f"{label} – 95% CI (Upper)",
+            value=0.0,
+            format="%.4f"
+        )
+
         # Importance selection
         chosen_importance_label = st.sidebar.radio(
-            f"{od['label']} – Importance",
+            f"{label} – Importance",
             ["High", "Medium", "Low"],
-            index=0
+            index=1  # "Medium" as the default
         )
         imp_value = convert_importance(chosen_importance_label)
 
+        # Save all info in a dictionary
         user_data.append({
-            "outcome": od["label"],
+            "outcome": label,
             "rd": rd_value,
+            "ci_lower": ci_lower,
+            "ci_upper": ci_upper,
             "importance": imp_value,
         })
 
-    # 2) Additional constraints
     st.sidebar.header("2) Additional Constraints")
     st.sidebar.write("Specify the level of concern for each constraint.")
-    
+
     constraint_options = ["No problem", "Moderate concern", "Severe problem"]
 
     cost_label = st.sidebar.radio("Financial / Cost Issues", constraint_options, index=0)
@@ -73,111 +77,105 @@ def main():
     cost_val = constraint_to_numeric(cost_label)
     access_val = constraint_to_numeric(access_label)
     care_val = constraint_to_numeric(care_label)
-    
-    # 3) Action button
+
+    # Button to calculate
     if st.button("Calculate Net Benefit"):
         show_results(user_data, cost_val, access_val, care_val)
 
+
 def show_results(user_data, cost_val, access_val, care_val):
     """
-    Summarize the overall net benefit calculation
-    using a simplified approach: sum(RD * importance).
-    
-    Then factor in constraints by adjusting or
-    providing interpretive comments.
-    
-    This is where you could insert the professor’s 
-    more advanced formula for net benefit, correlation, etc.
-    """
-    st.subheader("A) Outcome-Level Information")
+    Summarize the net benefit calculation using a simple approach:
+       net_effect = sum(RD_k * importance_k).
 
-    # 1) Weighted sum using a basic formula
-    #    net_effect = Σ (RD_k * weight_k)
-    # In real usage, you might incorporate correlation matrices,
-    # confidence intervals, or placeholders for AHP, DCE, etc.
+    We'll also show the CI that the user entered, but not necessarily do
+    anything fancy with it unless you want to incorporate it in the logic.
+    """
+    st.subheader("A) Outcome-Level Details")
+
     net_effect = 0.0
+
     for row in user_data:
+        # Basic additive model: net_effect += (rd * importance)
+        # In an advanced approach, you might incorporate correlation or 
+        # more sophisticated weighting. This is just the simplest approach.
         net_effect += row["rd"] * row["importance"]
 
-    # 2) Provide interpretive feedback
-    #    You can define your own thresholds for “good/bad” effect.
+    # Provide interpretive feedback
     if net_effect > 0.05:
-        st.error("Overall, it seems the net effect may be harmful.")
+        st.error("Overall net effect may be harmful (positive direction).")
     elif net_effect > 0:
-        st.warning("Somewhat harmful, but relatively small magnitude.")
+        st.warning("Somewhat harmful, but of smaller magnitude.")
     elif abs(net_effect) < 1e-9:
-        st.info("Overall net effect is approximately neutral.")
+        st.info("Overall effect is approximately neutral.")
     else:  # net_effect < 0
         if net_effect < -0.05:
-            st.success("Overall, it seems the net effect may be beneficial!")
+            st.success("Overall net effect may be beneficial (negative direction).")
         else:
-            st.info("Somewhat beneficial, but relatively small magnitude.")
-    
-    # 3) Show each outcome with an arrow and star rating
-    st.markdown("### Outcome Details")
+            st.info("Somewhat beneficial, but of smaller magnitude.")
+
+    st.markdown("### Individual Outcomes")
     for row in user_data:
         arrow = get_arrow(row["rd"])
-        stars_html = star_html_3(row["importance"])  # star icons
-        # sign_text is optional: if RD is negative => beneficial, positive => harmful
-        sign_text = "Beneficial" if row["rd"] < 0 else "Harmful" if row["rd"] > 0 else "Neutral"
-        
+        stars_html = star_html_3(row["importance"])
+
+        # If RD > 0, you might label it harmful or improved risk
+        # but we simply note the sign in parentheses
+        sign_text = "Positive RD" if row["rd"] > 0 else "Negative RD" if row["rd"] < 0 else "Zero"
+
         st.markdown(
-            f"- **{row['outcome']}**: {stars_html} {arrow} ({sign_text})", 
+            f"- **{row['outcome']}**: {stars_html} {arrow} ({sign_text}) "
+            f"[95% CI: {row['ci_lower']}, {row['ci_upper']}]",
             unsafe_allow_html=True
         )
 
-    # 4) Constraints
-    st.subheader("B) Constraint Considerations")
+    # Constraints
+    st.subheader("B) Constraints")
     constraint_total = cost_val + access_val + care_val
-    
+
     if constraint_total == 0:
         st.success("No major constraints identified. Feasibility looks good.")
     elif constraint_total <= 1:
-        st.info("Some minor constraints. May be addressable with moderate effort.")
+        st.info("Some minor constraints. Possibly manageable with moderate effort.")
     elif constraint_total <= 2:
-        st.warning("Multiple constraints likely. Additional support or adjustments needed.")
+        st.warning("Several constraints likely. Additional support or adjustments may be required.")
     else:
-        st.error("Severe constraints across cost, access, and care. Careful planning needed.")
-    
+        st.error("Severe constraints across multiple dimensions. Careful planning needed.")
+
     st.markdown("### Constraint Breakdown")
     st.write(f"- Financial: **{numeric_to_constraint_label(cost_val)}**")
     st.write(f"- Access: **{numeric_to_constraint_label(access_val)}**")
     st.write(f"- Care: **{numeric_to_constraint_label(care_val)}**")
 
-    # 5) Potential place for advanced suggestions or “best option” logic
-    st.subheader("C) Advanced Methods Placeholder")
+    # Placeholder for advanced methods
+    st.subheader("C) Advanced Methods (Placeholder)")
     st.markdown("""
-    - **AHP (Analytic Hierarchy Process)**: We can formalize the pairwise comparisons 
-      of outcomes or constraints to get consistent weights.
-    - **Swing Weighting**: We can ask the user to assess the “swing” (difference between 
-      worst and best) for each outcome to derive more precise weights.
-    - **DCE (Discrete Choice Experiments)**: We can gather preference data from multiple 
-      choice scenarios to estimate more robust utility weights.
-    
-    All these methods would feed into the net benefit calculation. 
-    For the prototype, we’re just doing a simple additive weighting with the user-specified importance.
+    In a more advanced version:
+    - **Incorporate confidence intervals** into a probabilistic net benefit approach.
+    - Use **AHP, Swing Weighting, or Discrete Choice Experiments** to derive or refine the 
+      'importance' weighting for each outcome.
+    - Combine multiple outcomes with correlation or other advanced modeling from 
+      the professor's formulas.
     """)
+
 
 # ---------------- HELPER FUNCTIONS ----------------
 
 def convert_importance(label):
     """
-    Convert user-friendly importance labels to numeric values
-    for weighting. You can refine this scale.
+    Convert user-friendly importance labels to numeric weighting values.
     """
     if label == "High":
         return 1.0
     elif label == "Medium":
         return 0.5
     else:
-        return 0.0  # Low
+        # "Low"
+        return 0.0
 
 def constraint_to_numeric(label):
     """
-    Convert constraint labels to numeric values.
-    0 = No problem
-    0.5 = Moderate concern
-    1.0 = Severe problem
+    Convert constraint labels to numeric values for summation.
     """
     if label == "No problem":
         return 0.0
@@ -187,8 +185,10 @@ def constraint_to_numeric(label):
         return 1.0
 
 def numeric_to_constraint_label(value):
-    """Reverse lookup for constraint levels."""
-    if value == 0:
+    """
+    Inverse mapping for constraint values.
+    """
+    if value == 0.0:
         return "No problem"
     elif value == 0.5:
         return "Moderate concern"
@@ -196,7 +196,9 @@ def numeric_to_constraint_label(value):
         return "Severe problem"
 
 def get_arrow(rd):
-    """Return arrow emoji based on RD threshold."""
+    """
+    Return arrow based on Risk Difference sign and threshold.
+    """
     if rd > 0.05:
         return "⬆️"
     elif rd < -0.05:
@@ -206,14 +208,10 @@ def get_arrow(rd):
 
 def star_html_3(importance):
     """
-    Return an HTML string with 3 stars in a row:
-      - Gold star for 'filled'
-      - LightGray star for 'empty'
-    
-    High (1.0) = 3 gold
-    Medium (0.5) = 2 gold, 1 gray
-    Low (0.0) = 1 gold, 2 gray
-    (Adjust if you want zero gold for Low, etc.)
+    Return an HTML string with 3 stars, colored gold or gray based on importance.
+    High (1.0): 3 gold
+    Medium (0.5): 2 gold, 1 gray
+    Low (0.0): 1 gold, 2 gray (adjust if you'd prefer 0 gold for Low).
     """
     if importance == 1.0:
         filled = 3
@@ -231,6 +229,7 @@ def star_html_3(importance):
             stars_html += "<span style='color:lightgray;font-size:18px;'>★</span>"
 
     return stars_html
+
 
 if __name__ == "__main__":
     main()
