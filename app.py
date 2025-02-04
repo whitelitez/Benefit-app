@@ -12,7 +12,7 @@ def main():
         </p>
         <p>
         <strong>Overview:</strong><br>
-        This prototype lets users (e.g., patients) input <strong>Risk Differences (RD)</strong>, 
+        This prototype lets users (e.g., patients) input <strong>Risk Differences</strong>, 
         Confidence Intervals, and Outcome Importance for a set of outcomes.<br>
         <em>No hard-coded RD defaults</em> — the user explicitly enters all values.<br>
         We demonstrate a simple net benefit calculation based on (RD × importance), 
@@ -40,7 +40,7 @@ def main():
         st.sidebar.subheader(label)
 
         rd_value = st.sidebar.number_input(
-            f"{label} – Risk Difference (E_ijk)",
+            f"{label} – Risk Difference",
             value=0.0,  # default 0.0
             format="%.4f"
         )
@@ -92,11 +92,11 @@ def show_results(user_data, cost_val, access_val, care_val):
     """
     Summarize the net benefit using a simple approach:
        net_effect = sum(RD_k * importance_k).
+
     Replace this with the professor's formulas (RD, AHP, DCE, correlation, etc.) as needed.
     """
     st.subheader("A) Outcome-Level Details")
 
-    # Calculate net effect
     net_effect = 0.0
     for row in user_data:
         net_effect += row["rd"] * row["importance"]
@@ -159,13 +159,13 @@ def show_results(user_data, cost_val, access_val, care_val):
 
 def display_outcome_line(row):
     """
-    Constructs a user-friendly outcome line, omitting "(Zero)" and
-    "[95% CI: 0.0, 0.0]" if those values are still default or near zero.
+    Constructs a user-friendly outcome line, omitting "Zero" and
+    "[95% CI: 0.0, 0.0]" if those values are all default or near zero.
     """
     arrow = get_arrow(row["rd"])
     stars_html = star_html_3(row["importance"])
 
-    # Omit "Zero" if RD is effectively 0.0
+    # Omit "Zero" if RD is 0.0
     if abs(row["rd"]) < 1e-9:
         sign_text = ""
     else:
@@ -175,7 +175,6 @@ def display_outcome_line(row):
     show_ci = not (abs(row["ci_lower"]) < 1e-9 and abs(row["ci_upper"]) < 1e-9)
     ci_text = f"[95% CI: {row['ci_lower']}, {row['ci_upper']}]" if show_ci else ""
 
-    # Build the display line
     display_line = f"- **{row['outcome']}**: {stars_html} {arrow}"
     if sign_text:
         display_line += f" ({sign_text})"
@@ -188,21 +187,16 @@ def display_outcome_line(row):
 # ---------------- HELPER FUNCTIONS ----------------
 
 def convert_importance(label):
-    """
-    Convert user-friendly importance labels to numeric weighting values.
-    """
+    """Convert user-friendly importance labels to numeric weighting values."""
     if label == "High":
         return 1.0
     elif label == "Medium":
         return 0.5
     else:
-        # "Low"
         return 0.0
 
 def constraint_to_numeric(label):
-    """
-    Convert constraint labels to numeric values for summation.
-    """
+    """Convert constraint labels to numeric values for summation."""
     if label == "No problem":
         return 0.0
     elif label == "Moderate concern":
@@ -211,9 +205,7 @@ def constraint_to_numeric(label):
         return 1.0
 
 def numeric_to_constraint_label(value):
-    """
-    Inverse mapping for constraint values.
-    """
+    """Inverse mapping for constraint values."""
     if value == 0.0:
         return "No problem"
     elif value == 0.5:
@@ -222,9 +214,7 @@ def numeric_to_constraint_label(value):
         return "Severe problem"
 
 def get_arrow(rd):
-    """
-    Return an arrow based on RD sign and threshold.
-    """
+    """Return an arrow based on RD sign and threshold."""
     if rd > 0.05:
         return "⬆️"
     elif rd < -0.05:
@@ -253,7 +243,6 @@ def star_html_3(importance):
             stars_html += "<span style='color:gold;font-size:18px;'>★</span>"
         else:
             stars_html += "<span style='color:lightgray;font-size:18px;'>★</span>"
-
     return stars_html
 
 
