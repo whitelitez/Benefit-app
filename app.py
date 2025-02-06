@@ -55,19 +55,21 @@ def main():
             format="%.4f"
         )
 
-        chosen_importance_label = st.sidebar.radio(
-            f"{label} – Importance",
-            ["High", "Medium", "Low"],
-            index=1  # default "Medium"
+        # Convert from radio to slider for importance
+        importance_val = st.sidebar.slider(
+            f"{label} – Importance (0.0 = Not Important, 1.0 = Extremely Important)",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.5,  # default
+            step=0.1
         )
-        imp_value = convert_importance(chosen_importance_label)
 
         user_data.append({
             "outcome": label,
             "rd": rd_value,
             "ci_lower": ci_lower,
             "ci_upper": ci_upper,
-            "importance": imp_value,
+            "importance": importance_val,
         })
 
     # Additional constraints
@@ -165,13 +167,11 @@ def display_outcome_line(row):
     arrow = get_arrow(row["rd"])
     stars_html = star_html_3(row["importance"])
 
-    # Omit "Zero" if RD is 0.0
     if abs(row["rd"]) < 1e-9:
         sign_text = ""
     else:
         sign_text = "Positive RD" if row["rd"] > 0 else "Negative RD"
 
-    # If both CI Lower/Upper are 0.0, we hide it
     show_ci = not (abs(row["ci_lower"]) < 1e-9 and abs(row["ci_upper"]) < 1e-9)
     ci_text = f"[95% CI: {row['ci_lower']}, {row['ci_upper']}]" if show_ci else ""
 
@@ -187,7 +187,7 @@ def display_outcome_line(row):
 # ---------------- HELPER FUNCTIONS ----------------
 
 def convert_importance(label):
-    """Convert user-friendly importance labels to numeric weighting values."""
+    """(No longer used in this slider version, but kept as reference)"""
     if label == "High":
         return 1.0
     elif label == "Medium":
@@ -224,17 +224,19 @@ def get_arrow(rd):
 
 def star_html_3(importance):
     """
-    Return an HTML string with 3 stars, colored gold or gray based on importance.
-    High (1.0): 3 gold
-    Medium (0.5): 2 gold, 1 gray
-    Low (0.0): 1 gold, 2 gray
+    Convert the 0.0–1.0 importance slider into 1..3 stars for display.
+    For example:
+      - 0.0–0.33 => 1 star
+      - 0.34–0.66 => 2 stars
+      - 0.67–1.0 => 3 stars
+    Adjust thresholds as needed.
     """
-    if importance == 1.0:
-        filled = 3
-    elif importance == 0.5:
+    if importance <= 0.33:
+        filled = 1
+    elif importance <= 0.66:
         filled = 2
     else:
-        filled = 1
+        filled = 3
 
     total = 3
     stars_html = ""
