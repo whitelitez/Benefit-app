@@ -14,16 +14,18 @@ def main():
         <strong>Overview:</strong><br>
         This prototype lets users (e.g., patients) input <strong>Risk Differences</strong>, 
         Confidence Intervals, and Outcome Importance for a set of outcomes.<br>
-        <em>No hard-coded RD defaults</em> — the user explicitly enters all values.<br>
-        We demonstrate a simple net benefit calculation based on (RD × importance), 
-        but you will later integrate the <strong>professor’s exact formulas</strong> 
-        (including <em>AHP, DCE, Swing Weighting</em>, etc.) for the final product.
+        <em>No hard-coded RD defaults</em> — the user explicitly enters all values via sliders (for RD & CI).<br>
+        We demonstrate a simple net benefit calculation based on (RD × importance).<br>
+        Later, integrate the <strong>professor’s exact formulas</strong> 
+        (including <em>AHP, DCE, Swing Weighting</em>, etc.) for the final product.<br>
+        Note: The current min/max range for the RD & CI sliders (–0.50 to +0.50) 
+        is just a placeholder. Adjust as necessary.
         </p>
         """,
         unsafe_allow_html=True
     )
 
-    # Define the outcomes we want to evaluate.
+    # Define the outcomes we want to evaluate
     outcome_labels = [
         "Prevention of stroke",
         "Prevention of heart failure",
@@ -39,37 +41,47 @@ def main():
     for label in outcome_labels:
         st.sidebar.subheader(label)
 
-        rd_value = st.sidebar.number_input(
+        # Risk Difference slider (example range: -0.5 to +0.5)
+        rd_value = st.sidebar.slider(
             f"{label} – Risk Difference",
-            value=0.0,  # default 0.0
-            format="%.4f"
-        )
-        ci_lower = st.sidebar.number_input(
-            f"{label} – 95% CI (Lower)",
+            min_value=-0.50,
+            max_value=0.50,
             value=0.0,
-            format="%.4f"
-        )
-        ci_upper = st.sidebar.number_input(
-            f"{label} – 95% CI (Upper)",
-            value=0.0,
-            format="%.4f"
+            step=0.01
         )
 
-        # Convert from radio to slider for importance
-        importance_val = st.sidebar.slider(
-            f"{label} – Importance (0.0 = Not Important, 1.0 = Extremely Important)",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.5,  # default
-            step=0.1
+        # 95% CI Lower slider
+        ci_lower = st.sidebar.slider(
+            f"{label} – 95% CI (Lower)",
+            min_value=-0.50,
+            max_value=0.50,
+            value=0.0,
+            step=0.01
         )
+
+        # 95% CI Upper slider
+        ci_upper = st.sidebar.slider(
+            f"{label} – 95% CI (Upper)",
+            min_value=-0.50,
+            max_value=0.50,
+            value=0.0,
+            step=0.01
+        )
+
+        # Radio buttons for Importance (High, Medium, Low)
+        chosen_importance_label = st.sidebar.radio(
+            f"{label} – Importance",
+            ["High", "Medium", "Low"],
+            index=1  # default "Medium"
+        )
+        imp_value = convert_importance(chosen_importance_label)
 
         user_data.append({
             "outcome": label,
             "rd": rd_value,
             "ci_lower": ci_lower,
             "ci_upper": ci_upper,
-            "importance": importance_val,
+            "importance": imp_value,
         })
 
     # Additional constraints
@@ -187,7 +199,9 @@ def display_outcome_line(row):
 # ---------------- HELPER FUNCTIONS ----------------
 
 def convert_importance(label):
-    """(No longer used in this slider version, but kept as reference)"""
+    """
+    Convert user-friendly importance labels to numeric weighting values.
+    """
     if label == "High":
         return 1.0
     elif label == "Medium":
@@ -224,19 +238,17 @@ def get_arrow(rd):
 
 def star_html_3(importance):
     """
-    Convert the 0.0–1.0 importance slider into 1..3 stars for display.
-    For example:
-      - 0.0–0.33 => 1 star
-      - 0.34–0.66 => 2 stars
-      - 0.67–1.0 => 3 stars
-    Adjust thresholds as needed.
+    Return an HTML string with 3 stars, colored gold or gray based on importance.
+    High (1.0): 3 gold
+    Medium (0.5): 2 gold, 1 gray
+    Low (0.0): 1 gold, 2 gray
     """
-    if importance <= 0.33:
-        filled = 1
-    elif importance <= 0.66:
+    if importance == 1.0:
+        filled = 3
+    elif importance == 0.5:
         filled = 2
     else:
-        filled = 3
+        filled = 1
 
     total = 3
     stars_html = ""
