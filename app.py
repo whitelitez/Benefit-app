@@ -1,10 +1,8 @@
 import streamlit as st
 
 def main():
-    # Page title
     st.title("Net Benefit Calculation Prototype")
 
-    # Intro / disclaimers
     st.markdown(
         """
         <p style='color:red; font-weight:bold;'>
@@ -21,24 +19,22 @@ def main():
         unsafe_allow_html=True
     )
 
-    # We define outcomes with an internal "f" (fixed) but don't show it
+    # Define outcomes internally with F, but we don't show F in the UI
     outcomes = [
-        {"display_name": "Stroke Prevention",      "f":  1, "default_e":  0.10, "default_i": 100},
-        {"display_name": "Heart Failure Prevention","f": 1, "default_e": -0.10, "default_i":  29},
-        {"display_name": "Dizziness",             "f": -1, "default_e":  0.02, "default_i":   5},
-        {"display_name": "Urination Frequency",    "f": -1, "default_e": -0.01, "default_i":   4},
-        {"display_name": "Fall Risk",             "f": -1, "default_e": -0.02, "default_i":  13},
+        {"display_name": "Stroke Prevention",       "f":  1, "default_e":  0.10, "default_i": 100},
+        {"display_name": "Heart Failure Prevention","f":  1, "default_e": -0.10, "default_i":  29},
+        {"display_name": "Dizziness",              "f": -1, "default_e":  0.02, "default_i":   5},
+        {"display_name": "Urination Frequency",     "f": -1, "default_e": -0.01, "default_i":   4},
+        {"display_name": "Fall Risk",              "f": -1, "default_e": -0.02, "default_i":  13},
     ]
 
-    # 1) Sidebar for outcome inputs
+    # 1) Sidebar for user inputs
     st.sidebar.header("Adjust Outcomes and Their Importance")
 
     user_data = []
     for item in outcomes:
         st.sidebar.subheader(item["display_name"])
 
-        # We hide the mention of "F (fixed)"
-        # We only let the user set the "Change in Risk" (E) and "Importance"
         e_val = st.sidebar.number_input(
             f"{item['display_name']} – Estimated Change in Risk",
             value=float(item["default_e"]),
@@ -53,10 +49,9 @@ def main():
             step=1
         )
 
-        # Store everything internally
         user_data.append({
             "label": item["display_name"],
-            "f": item["f"],      # hidden from user
+            "f": item["f"],  # hidden from the user in the UI
             "e": e_val,
             "i": i_val
         })
@@ -64,7 +59,6 @@ def main():
     # 2) Constraints
     st.sidebar.header("Constraints")
     constraint_options = ["No problem", "Moderate concern", "Severe problem"]
-
     cost_label = st.sidebar.radio("Financial / Cost Issues", constraint_options, index=0)
     access_label = st.sidebar.radio("Access / Transportation Issues", constraint_options, index=0)
     care_label = st.sidebar.radio("Home Care / Assistance Issues", constraint_options, index=0)
@@ -100,18 +94,18 @@ def show_results(user_data, cost_val, access_val, care_val):
     st.markdown("### Outcome Breakdown")
     k_values = []
     for row in user_data:
-        # j_k is the fraction of total importance
         j_k = row["i"] / total_i
-        # k_k is e * j_k * f
         k_k = row["e"] * j_k * row["f"]
         k_values.append(k_k)
 
-        # For display, show a simpler label
         arrow = get_arrow(row["e"] * row["f"])
         stars = star_html_3(row["i"])  # 0..100 => star rating
+
+        # NOTE: Use unsafe_allow_html=True here to properly render HTML
         st.markdown(
-            f"- **{row['label']}**: {arrow} {stars}  "
-            f"(Estimated Change in Risk = {row['e']:.3f}, Importance = {row['i']})"
+            f"- **{row['label']}**: {arrow} {stars} "
+            f"(Estimated Change in Risk = {row['e']:.3f}, Importance = {row['i']})",
+            unsafe_allow_html=True
         )
 
     net_sum = sum(k_values)
