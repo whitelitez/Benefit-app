@@ -1,262 +1,115 @@
 import streamlit as st
+import math
 
 def main():
-    # Title
-    st.title("Net Benefit Evaluation Prototype (0–100 Importance Scale)")
+    st.title("Net Benefit (K24) Calculation – Fk Static, Eijk Editable")
 
-    # Disclaimers/Overview in red to highlight placeholders/drafts
-    st.markdown(
-        """
-        <p style='color:red; font-weight:bold;'>
-        (No Hardcoded Placeholders)
-        </p>
-        <p>
-        <strong>Overview:</strong><br>
-        This prototype lets users (e.g., patients) input 
-        <strong>Risk Differences</strong>, 
-        <strong>Confidence Intervals</strong>, and 
-        <strong>Outcome Importance (0–100)</strong> for a set of outcomes.<br>
-        We demonstrate a simple net benefit calculation based on: 
-        <code>net_effect = Σ (RD × (importance / 100))</code>.<br>
-        You can later integrate the <strong>professor's exact formulas</strong> 
-        (including AHP, DCE, Swing Weighting, correlation, etc.).<br>
-        Note: The current –0.50 to +0.50 range for RD & CI sliders 
-        is a placeholder. Adjust as necessary.
-        </p>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown("""
+    This app replicates the Excel logic, with:
+    - F<sub>k</sub> (beneficial/harmful flags) set to fixed values (non-editable).
+    - E<sub>k</sub> (Risk Difference) is user-editable.
+    - I<sub>k</sub> (Importance, 0–100) is user-editable.
+    
+    Formula references (Excel-like):
+    - F<sub>k</sub> in column E is static.
+    - E<sub>k</sub> in column F is user input.
+    - I<sub>k</sub> in column I is user input (0–100).
+    - J<sub>k</sub> = I<sub>k</sub> / Σ I<sub>k</sub>.
+    - K<sub>k</sub> = E<sub>k</sub> × J<sub>k</sub> × F<sub>k</sub>.
+    - SUM(K<sub>k</sub>) => K17.
+    - K24 = ROUND(1000 × K17, 0).
+    """)
 
-    # Define the outcomes we want to evaluate
-    outcome_labels = [
-        "Prevention of stroke",
-        "Prevention of heart failure",
-        "Dizziness",
-        "Urination frequency",
-        "Fall risk"
+    # Define 5 outcomes with Fk fixed
+    # These F values correspond to your example:
+    #  1, 1, -1, -1, -1
+    # with default E values from your screenshot (0.1, -0.1, 0.02, -0.01, -0.02).
+    # The user can edit E if they like.
+    # The user can also edit I (0..100).
+    outcomes = [
+        {"label": "Outcome 1", "f": 1,  "default_e": 0.1,   "default_i": 100},
+        {"label": "Outcome 2", "f": 1,  "default_e": -0.1, "default_i": 29},
+        {"label": "Outcome 3", "f": -1, "default_e": 0.02, "default_i": 5},
+        {"label": "Outcome 4", "f": -1, "default_e": -0.01,"default_i": 4},
+        {"label": "Outcome 5", "f": -1, "default_e": -0.02,"default_i": 13},
     ]
 
-    # Sidebar inputs for RD, CI, and importance
-    st.sidebar.header("1) Outcomes, Risk Differences, and Confidence Intervals")
+    st.sidebar.header("E (Risk Difference) & I (Importance)")
 
     user_data = []
-    for label in outcome_labels:
-        st.sidebar.subheader(label)
+    for item in outcomes:
+        st.sidebar.subheader(item["label"])
 
-        # Risk Difference slider
-        rd_value = st.sidebar.slider(
-            f"{label} – Risk Difference",
-            min_value=-0.50,
-            max_value=0.50,
-            value=0.0,
-            step=0.01
+        # F is static, so we don't show an input for it; we only display it:
+        st.sidebar.write(f"F (fixed) = {item['f']}")
+
+        e_val = st.sidebar.number_input(
+            f"{item['label']}: E (Risk Diff)",
+            value=float(item["default_e"]),
+            format="%.3f"
         )
 
-        # 95% CI Lower slider
-        ci_lower = st.sidebar.slider(
-            f"{label} – 95% CI (Lower)",
-            min_value=-0.50,
-            max_value=0.50,
-            value=0.0,
-            step=0.01
-        )
-
-        # 95% CI Upper slider
-        ci_upper = st.sidebar.slider(
-            f"{label} – 95% CI (Upper)",
-            min_value=-0.50,
-            max_value=0.50,
-            value=0.0,
-            step=0.01
-        )
-
-        # Importance on a 0..100 scale
-        importance_0to100 = st.sidebar.slider(
-            f"{label} – Importance (0 = Not important, 100 = Most important)",
+        i_val = st.sidebar.slider(
+            f"{item['label']}: I (Importance 0–100)",
             min_value=0,
             max_value=100,
-            value=50,
+            value=item["default_i"],
             step=1
         )
 
         user_data.append({
-            "outcome": label,
-            "rd": rd_value,
-            "ci_lower": ci_lower,
-            "ci_upper": ci_upper,
-            "importance_0to100": importance_0to100,
+            "label": item["label"],
+            "f": item["f"],       # static
+            "e": e_val,           # user editable
+            "i": i_val            # user editable
         })
 
-    # Additional constraints
-    st.sidebar.header("2) Additional Constraints")
-    st.sidebar.write("Specify the level of concern for each constraint.")
+    if st.button("Compute K24"):
+        show_results(user_data)
 
-    constraint_options = ["No problem", "Moderate concern", "Severe problem"]
-
-    cost_label = st.sidebar.radio("Financial / Cost Issues", constraint_options, index=0)
-    access_label = st.sidebar.radio("Access / Transportation Issues", constraint_options, index=0)
-    care_label = st.sidebar.radio("Home Care / Assistance Issues", constraint_options, index=0)
-
-    cost_val = constraint_to_numeric(cost_label)
-    access_val = constraint_to_numeric(access_label)
-    care_val = constraint_to_numeric(care_label)
-
-    if st.button("Calculate Net Benefit"):
-        show_results(user_data, cost_val, access_val, care_val)
-
-
-def show_results(user_data, cost_val, access_val, care_val):
+def show_results(user_data):
     """
-    Summarize the net benefit using:
-       net_effect = Σ ( RD_k * (importance_k / 100) ).
-    Replace or supplement this with the professor's advanced formulas as needed.
+    Reproduce the Excel logic:
+      K_k = E_k * (I_k / sum(I_k)) * F_k
+      K17 = sum(K_k)
+      K24 = round(1000 * K17)
     """
-    st.subheader("A) Outcome-Level Details")
 
-    net_effect = 0.0
+    st.subheader("Step 1: Summation of I (ΣI)")
+    total_i = sum(row["i"] for row in user_data)
+    st.write(f"ΣI = {total_i} (sum of importance values)")
+
+    if abs(total_i) < 1e-9:
+        st.error("All importance values are zero. Cannot normalize. Please set at least one outcome > 0.")
+        return
+
+    # Compute K for each outcome
+    st.subheader("Step 2: Compute K_k = E_k × (I_k / ΣI) × F_k")
+    k_values = []
     for row in user_data:
-        # Convert the 0..100 scale to a 0..1 multiplier
-        importance_factor = row["importance_0to100"] / 100.0
-        net_effect += row["rd"] * importance_factor
+        j_k = row["i"] / total_i  # J_k
+        k_val = row["e"] * j_k * row["f"]
+        k_values.append(k_val)
 
-    # Provide interpretive feedback
-    if net_effect > 0.05:
-        st.error("Overall net effect seems harmful (positive direction).")
-    elif net_effect > 0:
-        st.warning("Slightly harmful, but smaller magnitude.")
-    elif abs(net_effect) < 1e-9:
-        st.info("Overall effect is approximately neutral.")
-    else:  # net_effect < 0
-        if net_effect < -0.05:
-            st.success("Overall net effect seems beneficial (negative direction).")
-        else:
-            st.info("Slightly beneficial, but smaller magnitude.")
+        st.markdown(
+            f"- **{row['label']}**: F={row['f']}, E={row['e']:.3f}, I={row['i']}, "
+            f"J={j_k:.3f}, **K={k_val:.4f}**"
+        )
 
-    # Show individual outcome details
-    st.markdown("### Individual Outcomes")
-    for row in user_data:
-        display_outcome_line(row)
+    # Sum of K_k => K17
+    k17 = sum(k_values)
+    st.subheader("Step 3: K17 = SUM(K_k)")
+    st.write(f"K17 = {k17:.4f}")
 
-    # Constraints
-    st.subheader("B) Constraints")
-    constraint_total = cost_val + access_val + care_val
+    # K24 = ROUND(1000 × K17, 0)
+    k24 = round(1000 * k17, 0)
+    st.subheader("Step 4: K24 = ROUND(1000 × K17, 0)")
+    st.write(f"K24 = {k24}")
 
-    if constraint_total == 0:
-        st.success("No major constraints identified. Feasibility looks good.")
-    elif constraint_total <= 1:
-        st.info("Some minor constraints. Possibly manageable with moderate effort.")
-    elif constraint_total <= 2:
-        st.warning("Multiple constraints likely. Additional support or adjustments needed.")
-    else:
-        st.error("Severe constraints across multiple dimensions. Careful planning required.")
-
-    st.markdown("### Constraint Breakdown")
-    st.write(f"- Financial: **{numeric_to_constraint_label(cost_val)}**")
-    st.write(f"- Access: **{numeric_to_constraint_label(access_val)}**")
-    st.write(f"- Care: **{numeric_to_constraint_label(care_val)}**")
-
-    # Red disclaimer for placeholders
-    st.subheader("C) Advanced Methods")
-    st.markdown(
-        """
-        <p style='color:red; font-weight:bold;'>
-        (Placeholder Section - Not Shown in Production)
-        </p>
-        <p>
-        In a more advanced version:
-        <ul>
-          <li><strong>Incorporate confidence intervals</strong> into a probabilistic net benefit approach.</li>
-          <li>Use <strong>AHP, Swing Weighting, or DCE</strong> to derive or refine the 0–100 importance weights.</li>
-          <li>Combine multiple outcomes with correlation and the full logic from the professor's formulas.</li>
-        </ul>
-        </p>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-def display_outcome_line(row):
-    """
-    Constructs a user-friendly outcome line, omitting "Zero" and
-    "[95% CI: 0.0, 0.0]" if those values are all default or near zero.
-
-    Star rating is derived from the 0..100 importance (similar to the professor's
-    approach where the most important outcome might be 100).
-    """
-    # Convert the 0..100 scale to 1..3 stars
-    stars_html = star_html_3(row["importance_0to100"])
-
-    arrow = get_arrow(row["rd"])
-    if abs(row["rd"]) < 1e-9:
-        sign_text = ""
-    else:
-        sign_text = "Positive RD" if row["rd"] > 0 else "Negative RD"
-
-    show_ci = not (abs(row["ci_lower"]) < 1e-9 and abs(row["ci_upper"]) < 1e-9)
-    ci_text = f"[95% CI: {row['ci_lower']}, {row['ci_upper']}]" if show_ci else ""
-
-    display_line = f"- **{row['outcome']}**: {stars_html} {arrow}"
-    if sign_text:
-        display_line += f" ({sign_text})"
-    if ci_text:
-        display_line += f" {ci_text}"
-
-    st.markdown(display_line, unsafe_allow_html=True)
-
-
-# ---------------- HELPER FUNCTIONS ----------------
-
-def constraint_to_numeric(label):
-    """Convert constraint labels to numeric values for summation."""
-    if label == "No problem":
-        return 0.0
-    elif label == "Moderate concern":
-        return 0.5
-    else:
-        return 1.0
-
-def numeric_to_constraint_label(value):
-    """Inverse mapping for constraint values."""
-    if value == 0.0:
-        return "No problem"
-    elif value == 0.5:
-        return "Moderate concern"
-    else:
-        return "Severe problem"
-
-def get_arrow(rd):
-    """Return an arrow based on RD sign and threshold."""
-    if rd > 0.05:
-        return "⬆️"
-    elif rd < -0.05:
-        return "⬇️"
-    else:
-        return "➡️"
-
-def star_html_3(importance_0to100):
-    """
-    Convert the 0..100 importance scale into a 1..3 star display.
-    Example thresholds (adjust if desired):
-      0..33   => 1 star
-      34..66  => 2 stars
-      67..100 => 3 stars
-    """
-    if importance_0to100 <= 33:
-        filled = 1
-    elif importance_0to100 <= 66:
-        filled = 2
-    else:
-        filled = 3
-
-    total = 3
-    stars_html = ""
-    for i in range(total):
-        if i < filled:
-            stars_html += "<span style='color:gold;font-size:18px;'>★</span>"
-        else:
-            stars_html += "<span style='color:lightgray;font-size:18px;'>★</span>"
-    return stars_html
-
+    st.markdown("""
+    The sign of K24 indicates harmful (+) vs. beneficial (–), 
+    depending on how F and E are assigned.
+    """)
 
 if __name__ == "__main__":
     main()
