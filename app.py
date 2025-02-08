@@ -14,8 +14,8 @@ def main():
         <em>estimated change in risk</em> and its <em>importance</em>. 
         We've set <strong>custom slider ranges</strong>:
         <ul>
-          <li>Stroke Prevention & Heart Failure Prevention: –0.1 to +0.1</li>
-          <li>Dizziness, Urination Frequency, Fall Risk: –0.2 to +0.2</li>
+          <li>Stroke Prevention & Heart Failure Prevention: –0.10 to +0.10</li>
+          <li>Dizziness, Urination Frequency, Fall Risk: –0.02 to +0.02</li>
         </ul>
         The internal math follows the professor’s Excel approach (K<sub>k</sub>, K17, K24).
         </p>
@@ -24,8 +24,8 @@ def main():
     )
 
     # Define outcomes with custom slider bounds
-    # We keep F fixed, but each outcome has a separate range for E.
-    # 'min_e' and 'max_e' define the slider boundaries.
+    # "f" is fixed, "default_e" is the initial slider value, 
+    # "min_e" and "max_e" define the slider bounds for E.
     outcomes = [
         {
             "display_name": "Stroke Prevention",
@@ -48,24 +48,24 @@ def main():
             "f": -1,
             "default_e":  0.02,
             "default_i":  5,
-            "min_e": -0.20,
-            "max_e":  0.20
+            "min_e": -0.02,
+            "max_e":  0.02
         },
         {
             "display_name": "Urination Frequency",
             "f": -1,
             "default_e": -0.01,
             "default_i":  4,
-            "min_e": -0.20,
-            "max_e":  0.20
+            "min_e": -0.02,
+            "max_e":  0.02
         },
         {
             "display_name": "Fall Risk",
             "f": -1,
             "default_e": -0.02,
             "default_i": 13,
-            "min_e": -0.20,
-            "max_e":  0.20
+            "min_e": -0.02,
+            "max_e":  0.02
         },
     ]
 
@@ -81,7 +81,7 @@ def main():
             min_value=item["min_e"],
             max_value=item["max_e"],
             value=float(item["default_e"]),
-            step=0.01
+            step=0.001  # smaller step for 0.02 range
         )
 
         i_val = st.sidebar.slider(
