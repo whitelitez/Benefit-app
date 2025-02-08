@@ -1,7 +1,7 @@
 import streamlit as st
 
 def main():
-    st.title("Net Benefit Calculation Prototype")
+    st.title("Net Benefit Calculation Prototype (Custom Slider Bounds)")
 
     st.markdown(
         """
@@ -10,22 +10,63 @@ def main():
         </p>
         <p>
         <strong>Overview:</strong><br>
-        This app calculates a "net benefit score" based on how each outcome's 
-        effect (positive or negative) interacts with its importance, then sums them 
-        up to give a final value "per 1000 people." The technical details (e.g., F=1, E, K24) 
-        are hidden, but the internal math follows the professor’s Excel approach.
+        This app calculates a "net benefit score" based on each outcome's 
+        <em>estimated change in risk</em> and its <em>importance</em>. 
+        We've set <strong>custom slider ranges</strong>:
+        <ul>
+          <li>Stroke Prevention & Heart Failure Prevention: –0.1 to +0.1</li>
+          <li>Dizziness, Urination Frequency, Fall Risk: –0.2 to +0.2</li>
+        </ul>
+        The internal math follows the professor’s Excel approach (K<sub>k</sub>, K17, K24).
         </p>
         """,
         unsafe_allow_html=True
     )
 
-    # Define outcomes internally with F, but we don't show F in the UI
+    # Define outcomes with custom slider bounds
+    # We keep F fixed, but each outcome has a separate range for E.
+    # 'min_e' and 'max_e' define the slider boundaries.
     outcomes = [
-        {"display_name": "Stroke Prevention",       "f":  1, "default_e":  0.10, "default_i": 100},
-        {"display_name": "Heart Failure Prevention","f":  1, "default_e": -0.10, "default_i":  29},
-        {"display_name": "Dizziness",              "f": -1, "default_e":  0.02, "default_i":   5},
-        {"display_name": "Urination Frequency",     "f": -1, "default_e": -0.01, "default_i":   4},
-        {"display_name": "Fall Risk",              "f": -1, "default_e": -0.02, "default_i":  13},
+        {
+            "display_name": "Stroke Prevention",
+            "f":  1,
+            "default_e":  0.10,
+            "default_i": 100,
+            "min_e": -0.10,
+            "max_e":  0.10
+        },
+        {
+            "display_name": "Heart Failure Prevention",
+            "f":  1,
+            "default_e": -0.10,
+            "default_i": 29,
+            "min_e": -0.10,
+            "max_e":  0.10
+        },
+        {
+            "display_name": "Dizziness",
+            "f": -1,
+            "default_e":  0.02,
+            "default_i":  5,
+            "min_e": -0.20,
+            "max_e":  0.20
+        },
+        {
+            "display_name": "Urination Frequency",
+            "f": -1,
+            "default_e": -0.01,
+            "default_i":  4,
+            "min_e": -0.20,
+            "max_e":  0.20
+        },
+        {
+            "display_name": "Fall Risk",
+            "f": -1,
+            "default_e": -0.02,
+            "default_i": 13,
+            "min_e": -0.20,
+            "max_e":  0.20
+        },
     ]
 
     # 1) Sidebar for user inputs
@@ -35,10 +76,12 @@ def main():
     for item in outcomes:
         st.sidebar.subheader(item["display_name"])
 
-        e_val = st.sidebar.number_input(
+        e_val = st.sidebar.slider(
             f"{item['display_name']} – Estimated Change in Risk",
+            min_value=item["min_e"],
+            max_value=item["max_e"],
             value=float(item["default_e"]),
-            format="%.3f"
+            step=0.01
         )
 
         i_val = st.sidebar.slider(
@@ -51,7 +94,7 @@ def main():
 
         user_data.append({
             "label": item["display_name"],
-            "f": item["f"],  # hidden from the user in the UI
+            "f": item["f"],  
             "e": e_val,
             "i": i_val
         })
@@ -73,44 +116,34 @@ def main():
 
 
 def show_results(user_data, cost_val, access_val, care_val):
-    """
-    Performs the internal math:
-      - sum of I => total_i
-      - j_k = i_k / total_i
-      - k_k = e_k * j_k * f_k
-      - net_sum = sum(k_k)
-      - "Score per 1000" = round( 1000 * net_sum )
-    We rename them to simpler terms for display.
-    """
     st.subheader("Net Benefit Results")
 
-    # Calculate total importance
+    # 1) Sum of importance
     total_i = sum(row["i"] for row in user_data)
     if abs(total_i) < 1e-9:
         st.error("All importance values are zero. Please adjust at least one outcome above 0.")
         return
 
-    # Calculate each outcome's contribution
+    # 2) Compute each outcome's contribution
     st.markdown("### Outcome Breakdown")
     k_values = []
     for row in user_data:
-        j_k = row["i"] / total_i
+        j_k = row["i"] / total_i  # fraction of total importance
         k_k = row["e"] * j_k * row["f"]
         k_values.append(k_k)
 
         arrow = get_arrow(row["e"] * row["f"])
-        stars = star_html_3(row["i"])  # 0..100 => star rating
+        stars = star_html_3(row["i"])
 
-        # NOTE: Use unsafe_allow_html=True here to properly render HTML
         st.markdown(
             f"- **{row['label']}**: {arrow} {stars} "
             f"(Estimated Change in Risk = {row['e']:.3f}, Importance = {row['i']})",
             unsafe_allow_html=True
         )
 
+    # Net sum
     net_sum = sum(k_values)
-
-    # "Score per 1000" = round(1000 * net_sum)
+    # Convert to "people per 1000"
     score_1000 = round(1000 * net_sum, 0)
 
     # Interpret net_sum
