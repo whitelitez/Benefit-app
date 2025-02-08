@@ -1,84 +1,68 @@
 import streamlit as st
-import math
 
 def main():
     # Page title
-    st.title("Net Benefit Calculation App (Excel-Style Formulas, Inputs on Sidebar)")
+    st.title("Net Benefit Calculation Prototype")
 
     # Intro / disclaimers
     st.markdown(
         """
         <p style='color:red; font-weight:bold;'>
-        (No Hardcoded Placeholders Except for Defaults; Excel Logic in Python)
+        (User-Friendly Labels, No Technical Cell References)
         </p>
         <p>
         <strong>Overview:</strong><br>
-        This app replicates the professor's Excel logic for net benefit:
-        <ul>
-          <li><em>F<sub>k</sub></em> is fixed (+1 or –1).</li>
-          <li><em>E<sub>k</sub></em> (Risk Difference) is user-editable.</li>
-          <li><em>I<sub>k</sub></em> (Importance, 0–100) is user-editable.</li>
-          <li><em>J<sub>k</sub> = I<sub>k</sub> / ΣI<sub>k</sub></em>, 
-              <em>K<sub>k</sub> = E<sub>k</sub> × J<sub>k</sub> × F<sub>k</sub></em>.</li>
-          <li>Sum K<sub>k</sub> → K17, then <em>K24 = ROUND(1000 × K17)</em>.</li>
-        </ul>
-        All input fields are on the <strong>sidebar</strong>. 
-        See below for final results and interpretation.
+        This app calculates a "net benefit score" based on how each outcome's 
+        effect (positive or negative) interacts with its importance, then sums them 
+        up to give a final value "per 1000 people." The technical details (e.g., F=1, E, K24) 
+        are hidden, but the internal math follows the professor’s Excel approach.
         </p>
         """,
         unsafe_allow_html=True
     )
 
-    # Define up to 5 outcomes with fixed Fk, default E, default I
+    # We define outcomes with an internal "f" (fixed) but don't show it
     outcomes = [
-        {"label": "Outcome 1: Stroke Prevention",    "f":  1, "default_e":  0.1,  "default_i": 100},
-        {"label": "Outcome 2: Heart Failure Prev.",  "f":  1, "default_e": -0.1, "default_i":  29},
-        {"label": "Outcome 3: Dizziness",            "f": -1, "default_e":  0.02, "default_i":  5},
-        {"label": "Outcome 4: Urination Frequency",  "f": -1, "default_e": -0.01,"default_i":  4},
-        {"label": "Outcome 5: Fall Risk",            "f": -1, "default_e": -0.02,"default_i": 13},
+        {"display_name": "Stroke Prevention",      "f":  1, "default_e":  0.10, "default_i": 100},
+        {"display_name": "Heart Failure Prevention","f": 1, "default_e": -0.10, "default_i":  29},
+        {"display_name": "Dizziness",             "f": -1, "default_e":  0.02, "default_i":   5},
+        {"display_name": "Urination Frequency",    "f": -1, "default_e": -0.01, "default_i":   4},
+        {"display_name": "Fall Risk",             "f": -1, "default_e": -0.02, "default_i":  13},
     ]
 
-    # --------------------------
-    # PART 1: Outcome Inputs
-    # --------------------------
-    st.sidebar.header("1) Outcome Inputs & Importance")
+    # 1) Sidebar for outcome inputs
+    st.sidebar.header("Adjust Outcomes and Their Importance")
 
     user_data = []
     for item in outcomes:
-        st.sidebar.subheader(item["label"])
+        st.sidebar.subheader(item["display_name"])
 
-        # F is fixed; just display
-        st.sidebar.write(f"F (fixed) = {item['f']}")
-
-        # E is editable
+        # We hide the mention of "F (fixed)"
+        # We only let the user set the "Change in Risk" (E) and "Importance"
         e_val = st.sidebar.number_input(
-            f"{item['label']}: E (Risk Diff)",
+            f"{item['display_name']} – Estimated Change in Risk",
             value=float(item["default_e"]),
             format="%.3f"
         )
 
-        # I is editable from 0..100
         i_val = st.sidebar.slider(
-            f"{item['label']}: Importance (0..100)",
+            f"{item['display_name']} – Importance (0 = Not important, 100 = Very important)",
             min_value=0,
             max_value=100,
             value=item["default_i"],
             step=1
         )
 
+        # Store everything internally
         user_data.append({
-            "label": item["label"],
-            "f": item["f"],
+            "label": item["display_name"],
+            "f": item["f"],      # hidden from user
             "e": e_val,
             "i": i_val
         })
 
-    # --------------------------
-    # PART 2: Constraints
-    # --------------------------
-    st.sidebar.header("2) Constraints")
-    st.sidebar.write("Specify your level of concern for each constraint:")
-
+    # 2) Constraints
+    st.sidebar.header("Constraints")
     constraint_options = ["No problem", "Moderate concern", "Severe problem"]
 
     cost_label = st.sidebar.radio("Financial / Cost Issues", constraint_options, index=0)
@@ -89,102 +73,93 @@ def main():
     access_val = constraint_to_numeric(access_label)
     care_val = constraint_to_numeric(care_label)
 
-    # Button to calculate net benefit
-    if st.sidebar.button("Calculate Net Benefit (K24)"):
-        # We move to the results section
+    # Button
+    if st.sidebar.button("Calculate Net Benefit"):
         show_results(user_data, cost_val, access_val, care_val)
 
 
 def show_results(user_data, cost_val, access_val, care_val):
     """
-    Implements the Excel-like logic:
-      1) total_i = sum(I_k).
-      2) J_k = I_k / total_i
-      3) K_k = E_k * J_k * F_k
-      4) K17 = sum(K_k)
-      5) K24 = round(1000 * K17)
-    Then interpret constraints, show star ratings, etc.
+    Performs the internal math:
+      - sum of I => total_i
+      - j_k = i_k / total_i
+      - k_k = e_k * j_k * f_k
+      - net_sum = sum(k_k)
+      - "Score per 1000" = round( 1000 * net_sum )
+    We rename them to simpler terms for display.
     """
-    st.subheader("A) Net Benefit Calculation Steps")
+    st.subheader("Net Benefit Results")
 
-    # 1) Sum of I
+    # Calculate total importance
     total_i = sum(row["i"] for row in user_data)
-    st.write(f"**Sum of Importance (ΣI)** = {total_i}")
-
     if abs(total_i) < 1e-9:
-        st.error("All importance values are zero. Cannot normalize. Please set at least one outcome > 0.")
+        st.error("All importance values are zero. Please adjust at least one outcome above 0.")
         return
 
-    # 2) Compute each K_k
+    # Calculate each outcome's contribution
+    st.markdown("### Outcome Breakdown")
     k_values = []
-    st.markdown("### Row-by-Row Computation of K_k (E×(I/ΣI)×F)")
     for row in user_data:
+        # j_k is the fraction of total importance
         j_k = row["i"] / total_i
-        k_val = row["e"] * j_k * row["f"]
-        k_values.append(k_val)
+        # k_k is e * j_k * f
+        k_k = row["e"] * j_k * row["f"]
+        k_values.append(k_k)
 
-        stars = star_html_3(row["i"])
+        # For display, show a simpler label
         arrow = get_arrow(row["e"] * row["f"])
-
+        stars = star_html_3(row["i"])  # 0..100 => star rating
         st.markdown(
-            f"- **{row['label']}**: "
-            f"F={row['f']}, E={row['e']:.3f}, I={row['i']}, J={j_k:.3f}, "
-            f"K={k_val:.4f} &nbsp;&nbsp;{stars} {arrow}",
-            unsafe_allow_html=True
+            f"- **{row['label']}**: {arrow} {stars}  "
+            f"(Estimated Change in Risk = {row['e']:.3f}, Importance = {row['i']})"
         )
 
-    # 3) K17 = sum(K_k)
-    k17 = sum(k_values)
-    st.markdown(f"**K17** (sum of K_k) = {k17:.4f}")
+    net_sum = sum(k_values)
 
-    # 4) K24 = round(1000 * K17)
-    k24 = round(1000 * k17, 0)
-    st.markdown(f"**K24** = round(1000 × K17, 0) = {k24}")
+    # "Score per 1000" = round(1000 * net_sum)
+    score_1000 = round(1000 * net_sum, 0)
 
-    # Provide interpretive feedback on sign
-    if k17 > 0:
-        st.warning("Positive K17 => net harmful direction (assuming F=+1 => beneficial?).")
-    elif abs(k17) < 1e-9:
-        st.info("K17 ≈ 0 => net effect is approximately neutral.")
+    # Interpret net_sum
+    if net_sum > 0:
+        st.warning("Overall direction suggests possible net harm.")
+    elif abs(net_sum) < 1e-9:
+        st.info("Overall effect appears neutral.")
     else:
-        st.success("Negative K17 => net beneficial direction (based on sign conventions).")
+        st.success("Overall direction suggests possible net benefit.")
 
-    # PART B: Constraints
-    st.subheader("B) Constraints")
+    st.markdown(
+        f"**Net Benefit Score** (summed effect): {net_sum:.4f}  \n"
+        f"**Estimated 'people per 1000'**: {score_1000:.0f}"
+    )
+
+    # Constraints
+    st.subheader("Constraints")
     constraint_total = cost_val + access_val + care_val
-
     if constraint_total == 0:
-        st.success("No major constraints identified. Feasibility looks good.")
+        st.success("No major constraints identified.")
     elif constraint_total <= 1:
-        st.info("Some minor constraints. Possibly manageable with moderate effort.")
+        st.info("Some minor constraints. Potentially manageable.")
     elif constraint_total <= 2:
         st.warning("Multiple constraints likely. Additional support or adjustments needed.")
     else:
         st.error("Severe constraints across multiple dimensions. Careful planning required.")
 
-    st.markdown("### Constraint Breakdown")
     st.write(f"- Financial: **{numeric_to_constraint_label(cost_val)}**")
     st.write(f"- Access: **{numeric_to_constraint_label(access_val)}**")
     st.write(f"- Care: **{numeric_to_constraint_label(care_val)}**")
 
-    # C) Placeholder for advanced expansions
-    st.subheader("C) Advanced Methods (Placeholder)")
+    # Placeholder
+    st.subheader("Further Analysis (Placeholder)")
     st.markdown(
         """
         <p style='color:red; font-weight:bold;'>
-        (Not Shown in Production)
+        (Advanced Methods Not Shown in Production)
         </p>
-        <p>
-        In a more advanced version:
         <ul>
-          <li>Incorporate <strong>correlation matrices</strong> or advanced weighting 
-              (AHP, DCE) for better net benefit calculations.</li>
-          <li>Handle <strong>confidence intervals</strong> in a probabilistic approach 
-              or show intervals for K24.</li>
-          <li>Show "per-1000 persons" in a more nuanced way, 
-              e.g., separate net effects for beneficial vs. harmful outcomes.</li>
+          <li>Incorporate correlation or advanced weighting (AHP, DCE)</li>
+          <li>Handle confidence intervals probabilistically</li>
+          <li>Refine interpretation for beneficial vs. harmful outcomes</li>
         </ul>
-        </p>
         """,
         unsafe_allow_html=True
     )
@@ -192,12 +167,23 @@ def show_results(user_data, cost_val, access_val, care_val):
 
 # ---------------- HELPER FUNCTIONS ----------------
 
+def constraint_to_numeric(label):
+    if label == "No problem":
+        return 0.0
+    elif label == "Moderate concern":
+        return 0.5
+    else:
+        return 1.0
+
+def numeric_to_constraint_label(value):
+    if value == 0.0:
+        return "No problem"
+    elif value == 0.5:
+        return "Moderate concern"
+    else:
+        return "Severe problem"
+
 def get_arrow(value):
-    """
-    Return arrow based on sign. 
-    > 0 => up arrow, < 0 => down arrow, else => right arrow.
-    Adjust threshold if needed.
-    """
     if value > 0.05:
         return "⬆️"
     elif value < -0.05:
@@ -207,11 +193,8 @@ def get_arrow(value):
 
 def star_html_3(importance_0to100):
     """
-    Convert 0..100 => a 1..3 star rating.
-    For example:
-     - 0..33 => 1 star
-     - 34..66 => 2 stars
-     - 67..100 => 3 stars
+    Convert 0..100 => 1..3 stars
+    e.g., 0..33 => 1 star, 34..66 => 2 stars, 67..100 => 3 stars
     """
     if importance_0to100 <= 33:
         filled = 1
@@ -227,28 +210,6 @@ def star_html_3(importance_0to100):
         else:
             stars += "<span style='color:lightgray;font-size:18px;'>★</span>"
     return stars
-
-def constraint_to_numeric(label):
-    """
-    Convert constraint labels to numeric values for summation logic.
-    """
-    if label == "No problem":
-        return 0.0
-    elif label == "Moderate concern":
-        return 0.5
-    else:
-        return 1.0
-
-def numeric_to_constraint_label(value):
-    """
-    Reverse mapping for constraint numeric => text.
-    """
-    if value == 0.0:
-        return "No problem"
-    elif value == 0.5:
-        return "Moderate concern"
-    else:
-        return "Severe problem"
 
 
 if __name__ == "__main__":
