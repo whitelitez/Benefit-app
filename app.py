@@ -2,7 +2,7 @@ import streamlit as st
 
 def main():
     # Title
-    st.title("Net Benefit Evaluation Prototype")
+    st.title("Net Benefit Evaluation Prototype (0–100 Importance Scale)")
 
     # Disclaimers/Overview in red to highlight placeholders/drafts
     st.markdown(
@@ -12,14 +12,16 @@ def main():
         </p>
         <p>
         <strong>Overview:</strong><br>
-        This prototype lets users (e.g., patients) input <strong>Risk Differences</strong>, 
-        Confidence Intervals, and Outcome Importance for a set of outcomes.<br>
-        <em>No hard-coded RD defaults</em> — the user explicitly enters all values via sliders (for RD & CI).<br>
-        We demonstrate a simple net benefit calculation based on (RD × importance).<br>
-        Later, integrate the <strong>professor’s exact formulas</strong> 
-        (including <em>AHP, DCE, Swing Weighting</em>, etc.) for the final product.<br>
-        Note: The current min/max range for the RD & CI sliders (–0.50 to +0.50) 
-        is just a placeholder. Adjust as necessary.
+        This prototype lets users (e.g., patients) input 
+        <strong>Risk Differences</strong>, 
+        <strong>Confidence Intervals</strong>, and 
+        <strong>Outcome Importance (0–100)</strong> for a set of outcomes.<br>
+        We demonstrate a simple net benefit calculation based on: 
+        <code>net_effect = Σ (RD × (importance / 100))</code>.<br>
+        You can later integrate the <strong>professor's exact formulas</strong> 
+        (including AHP, DCE, Swing Weighting, correlation, etc.).<br>
+        Note: The current –0.50 to +0.50 range for RD & CI sliders 
+        is a placeholder. Adjust as necessary.
         </p>
         """,
         unsafe_allow_html=True
@@ -41,7 +43,7 @@ def main():
     for label in outcome_labels:
         st.sidebar.subheader(label)
 
-        # Risk Difference slider (example range: -0.5 to +0.5)
+        # Risk Difference slider
         rd_value = st.sidebar.slider(
             f"{label} – Risk Difference",
             min_value=-0.50,
@@ -68,20 +70,21 @@ def main():
             step=0.01
         )
 
-        # Radio buttons for Importance (High, Medium, Low)
-        chosen_importance_label = st.sidebar.radio(
-            f"{label} – Importance",
-            ["High", "Medium", "Low"],
-            index=1  # default "Medium"
+        # Importance on a 0..100 scale
+        importance_0to100 = st.sidebar.slider(
+            f"{label} – Importance (0 = Not important, 100 = Most important)",
+            min_value=0,
+            max_value=100,
+            value=50,
+            step=1
         )
-        imp_value = convert_importance(chosen_importance_label)
 
         user_data.append({
             "outcome": label,
             "rd": rd_value,
             "ci_lower": ci_lower,
             "ci_upper": ci_upper,
-            "importance": imp_value,
+            "importance_0to100": importance_0to100,
         })
 
     # Additional constraints
@@ -104,16 +107,17 @@ def main():
 
 def show_results(user_data, cost_val, access_val, care_val):
     """
-    Summarize the net benefit using a simple approach:
-       net_effect = sum(RD_k * importance_k).
-
-    Replace this with the professor's formulas (RD, AHP, DCE, correlation, etc.) as needed.
+    Summarize the net benefit using:
+       net_effect = Σ ( RD_k * (importance_k / 100) ).
+    Replace or supplement this with the professor's advanced formulas as needed.
     """
     st.subheader("A) Outcome-Level Details")
 
     net_effect = 0.0
     for row in user_data:
-        net_effect += row["rd"] * row["importance"]
+        # Convert the 0..100 scale to a 0..1 multiplier
+        importance_factor = row["importance_0to100"] / 100.0
+        net_effect += row["rd"] * importance_factor
 
     # Provide interpretive feedback
     if net_effect > 0.05:
@@ -162,7 +166,7 @@ def show_results(user_data, cost_val, access_val, care_val):
         In a more advanced version:
         <ul>
           <li><strong>Incorporate confidence intervals</strong> into a probabilistic net benefit approach.</li>
-          <li>Use <strong>AHP, Swing Weighting, or DCE</strong> to derive or refine importance weights.</li>
+          <li>Use <strong>AHP, Swing Weighting, or DCE</strong> to derive or refine the 0–100 importance weights.</li>
           <li>Combine multiple outcomes with correlation and the full logic from the professor's formulas.</li>
         </ul>
         </p>
@@ -175,10 +179,14 @@ def display_outcome_line(row):
     """
     Constructs a user-friendly outcome line, omitting "Zero" and
     "[95% CI: 0.0, 0.0]" if those values are all default or near zero.
-    """
-    arrow = get_arrow(row["rd"])
-    stars_html = star_html_3(row["importance"])
 
+    Star rating is derived from the 0..100 importance (similar to the professor's
+    approach where the most important outcome might be 100).
+    """
+    # Convert the 0..100 scale to 1..3 stars
+    stars_html = star_html_3(row["importance_0to100"])
+
+    arrow = get_arrow(row["rd"])
     if abs(row["rd"]) < 1e-9:
         sign_text = ""
     else:
@@ -197,17 +205,6 @@ def display_outcome_line(row):
 
 
 # ---------------- HELPER FUNCTIONS ----------------
-
-def convert_importance(label):
-    """
-    Convert user-friendly importance labels to numeric weighting values.
-    """
-    if label == "High":
-        return 1.0
-    elif label == "Medium":
-        return 0.5
-    else:
-        return 0.0
 
 def constraint_to_numeric(label):
     """Convert constraint labels to numeric values for summation."""
@@ -236,19 +233,20 @@ def get_arrow(rd):
     else:
         return "➡️"
 
-def star_html_3(importance):
+def star_html_3(importance_0to100):
     """
-    Return an HTML string with 3 stars, colored gold or gray based on importance.
-    High (1.0): 3 gold
-    Medium (0.5): 2 gold, 1 gray
-    Low (0.0): 1 gold, 2 gray
+    Convert the 0..100 importance scale into a 1..3 star display.
+    Example thresholds (adjust if desired):
+      0..33   => 1 star
+      34..66  => 2 stars
+      67..100 => 3 stars
     """
-    if importance == 1.0:
-        filled = 3
-    elif importance == 0.5:
+    if importance_0to100 <= 33:
+        filled = 1
+    elif importance_0to100 <= 66:
         filled = 2
     else:
-        filled = 1
+        filled = 3
 
     total = 3
     stars_html = ""
