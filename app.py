@@ -160,7 +160,7 @@ def show_results(user_data, cost_val, access_val, care_val):
     elif constraint_total <= 2:
         st.warning("複数の制約が見られます。追加のサポートや対策を検討してください。")
     else:
-        st.error("費用・通院アクセス・介助面など、大きな問題がある可能性があります。慎重な検討が必要です。")
+        st.error("費用・通院アクセス・介助面など、ご不便をおかけする可能性があります。慎重な検討が必要です。")
     
     st.write(f"- 費用面: **{numeric_to_constraint_label(cost_val)}**")
     st.write(f"- アクセス面: **{numeric_to_constraint_label(access_val)}**")
@@ -182,7 +182,7 @@ def numeric_to_constraint_label(value):
     elif value == 0.5:
         return "やや問題"
     else:
-        return "大きな問題"
+        return "重視する"
 
 def star_html_5(net_effect):
     """
