@@ -75,7 +75,7 @@ def main():
         })
     
     st.sidebar.header("② 制約（Constraints）")
-    constraint_options = ["問題なし", "やや問題", "大きな問題"]
+    constraint_options = ["問題なし", "やや問題", "重視する"]
     cost_label = st.sidebar.radio("費用面の問題", constraint_options, index=0)
     access_label = st.sidebar.radio("通院アクセスの問題", constraint_options, index=0)
     care_label = st.sidebar.radio("介助面の問題", constraint_options, index=0)
